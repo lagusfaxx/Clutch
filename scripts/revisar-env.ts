@@ -87,6 +87,13 @@ function revisarSecretos(): Revision[] {
   return salida
 }
 
+/** Dominios de pruebas con DNS comodín: sirven por HTTP a propósito. */
+const DOMINIOS_PRUEBA = ['sslip.io', 'nip.io', 'localhost', '127.0.0.1', 'traefik.me']
+
+function esDePrueba(url: string): boolean {
+  return DOMINIOS_PRUEBA.some((d) => url.includes(d))
+}
+
 function revisarUrls(): Revision[] {
   const salida: Revision[] = []
   for (const nombre of ['SITE_URL', 'AUTH_URL']) {
@@ -103,12 +110,48 @@ function revisarUrls(): Revision[] {
       salida.push({ nivel: 'aviso', titulo: nombre, detalle: 'Sobra la barra del final: los links quedan con doble barra.' })
       continue
     }
-    const produccion = !valor.includes('localhost') && !valor.includes('127.0.0.1')
-    if (produccion && !valor.startsWith('https://')) {
-      salida.push({ nivel: 'aviso', titulo: nombre, detalle: 'En producción tiene que ser https.' })
+    if (!valor.startsWith('https://') && !esDePrueba(valor)) {
+      salida.push({ nivel: 'aviso', titulo: nombre, detalle: 'Dominio real sin https. Para producción tiene que ser https.' })
       continue
     }
-    salida.push({ nivel: 'ok', titulo: nombre, detalle: valor })
+    const modo = valor.startsWith('https://') ? '' : ' (HTTP, modo pruebas)'
+    salida.push({ nivel: 'ok', titulo: nombre, detalle: `${valor}${modo}` })
+  }
+
+  // La trampa cara: Auth.js decide si las cookies llevan Secure mirando el
+  // protocolo de AUTH_URL. Si dice https pero el sitio se sirve por HTTP, el
+  // navegador nunca devuelve la cookie y el login falla con MissingCSRF sin
+  // ninguna pista de por qué.
+  const sitio = process.env.SITE_URL?.trim()
+  const auth = process.env.AUTH_URL?.trim()
+  if (sitio && auth) {
+    const protoSitio = sitio.startsWith('https://')
+    const protoAuth = auth.startsWith('https://')
+    if (protoSitio !== protoAuth) {
+      salida.push({
+        nivel: 'falla',
+        titulo: 'Protocolos mezclados',
+        detalle:
+          'SITE_URL y AUTH_URL usan protocolos distintos. Con AUTH_URL en https sirviendo por HTTP, ' +
+          'las cookies salen marcadas Secure, el navegador no las manda y el login falla con MissingCSRF.',
+      })
+    } else if (sitio.replace(/^https?:\/\//, '') !== auth.replace(/^https?:\/\//, '')) {
+      salida.push({
+        nivel: 'aviso',
+        titulo: 'URLs distintas',
+        detalle: 'SITE_URL y AUTH_URL apuntan a hosts diferentes. Normalmente deben ser idénticas.',
+      })
+    }
+  }
+
+  if (auth && !auth.startsWith('https://') && hay('DISCORD_CLIENT_ID')) {
+    salida.push({
+      nivel: 'aviso',
+      titulo: 'Discord sobre HTTP',
+      detalle:
+        'Discord solo acepta redirecciones https, salvo http://localhost. Con un dominio de pruebas por HTTP ' +
+        'el login con Discord no va a funcionar. El login por correo sí.',
+    })
   }
   return salida
 }

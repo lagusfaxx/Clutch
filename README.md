@@ -71,6 +71,23 @@ programarlo y **subirlo a otra parte**: un respaldo en el mismo servidor que
 la base no es un respaldo. Si prefieres no hacerte cargo de eso, usa Coolify
 con su PostgreSQL gestionado, que trae respaldos programados.
 
+### Probar sin dominio ni certificado
+
+`sslip.io` resuelve cualquier IP sin tocar DNS. Pon las dos URLs con `http://`
+y el mismo host:
+
+```
+SITE_URL=http://190-0-0-1.sslip.io:3000
+AUTH_URL=http://190-0-0-1.sslip.io:3000
+```
+
+Si `AUTH_URL` queda en `https` mientras sirves por HTTP, las cookies salen
+marcadas `Secure`, el navegador no las devuelve y el login falla con
+`MissingCSRF` sin explicación. `npm run env:check` detecta esa mezcla.
+
+El login con Discord y Webpay no funcionan por HTTP; todo lo demás sí. El
+detalle está en [docs/VARIABLES.md](docs/VARIABLES.md).
+
 ## Levantarlo local sin Docker
 
 ```bash

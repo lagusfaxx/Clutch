@@ -102,6 +102,50 @@ AUTH_URL=https://clutch.cl
 
 En local, las dos son `http://localhost:3000`.
 
+### Pruebas por HTTP con sslip.io
+
+Mientras no haya dominio ni certificado, `sslip.io` resuelve cualquier IP:
+`http://190-0-0-1.sslip.io` apunta a `190.0.0.1` sin configurar DNS.
+
+Pon **las dos** variables con `http://`, el mismo host y el mismo puerto:
+
+```
+SITE_URL=http://190-0-0-1.sslip.io:3000
+AUTH_URL=http://190-0-0-1.sslip.io:3000
+```
+
+Reemplaza los números por la IP de tu servidor, con guiones en vez de
+puntos. Si publicas en el puerto 80, el `:3000` se omite en las dos.
+
+**El error que te va a costar la tarde:** Auth.js decide si las cookies de
+sesión llevan la marca `Secure` mirando el protocolo de `AUTH_URL`. Si ahí
+dice `https://` pero el sitio se sirve por HTTP, las cookies salen como
+`__Host-` y `__Secure-`, el navegador se niega a devolverlas por HTTP, y el
+login falla con `MissingCSRF` **sin dejar ninguna pista** de por qué: la
+pantalla simplemente vuelve al formulario. `npm run env:check` detecta esa
+mezcla y te la nombra.
+
+Lo que sí funciona por HTTP: el registro, el login por correo, los torneos,
+el ranking, la verificación de nicks y el panel. O sea, todo lo que
+necesitas para probar.
+
+Lo que no:
+
+- **Login con Discord.** Discord solo acepta redirecciones `https`, con la
+  única excepción de `http://localhost`. Un dominio de pruebas por HTTP no
+  le sirve. El bot de Discord sí funciona, porque no usa redirecciones.
+- **Webpay.** Transbank exige https para el retorno.
+
+Mientras corras por HTTP, el sitio no manda la cabecera HSTS: anunciarla sin
+certificado no protege nada, y en un dominio comodín como sslip.io podría
+dejarte el navegador forzando HTTPS contra un servidor que no lo tiene.
+Cuando pongas el certificado, la cabecera aparece sola.
+
+### Cuando pases a dominio y HTTPS
+
+Cambia las dos variables a `https://clutch.cl`, y recuerda actualizar la URL
+de callback en el portal de Discord. Nada más: el resto se ajusta solo.
+
 ---
 
 ## 4. Fortnite
