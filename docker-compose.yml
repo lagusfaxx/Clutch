@@ -38,16 +38,15 @@ services:
     build:
       context: .
       args:
-        # Dominios desde los que se aceptan envíos de formulario. Si queda
-        # vacío y el proxy no reenvía x-forwarded-host con el dominio
-        # público, Next rechaza cada formulario con "Invalid Server Actions
-        # request" y el usuario solo ve un error genérico.
+        # El dominio tiene que estar presente al CONSTRUIR, no solo al
+        # ejecutar: Next graba en la imagen desde qué orígenes acepta envíos
+        # de formulario. Si no calza, cada formulario del sitio falla con
+        # "Invalid Server Actions request".
         #
-        # Van como dos variables sueltas y el respaldo se resuelve en
-        # next.config. Anidar una sustitución dentro del valor por defecto de
-        # otra rompe el lector de archivos .env con "Invalid template", así
-        # que acá no puede haber sustituciones anidadas ni en los comentarios.
-        ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+        # Acá va una sola variable, y la que ya existe. Declarar una segunda
+        # solo para esto hace que el panel la registre como variable propia,
+        # y si queda guardada con un valor a medias ningún cambio en este
+        # archivo la corrige: hay que borrarla a mano en el panel.
         SITE_URL: ${SITE_URL:-}
     restart: unless-stopped
     depends_on:

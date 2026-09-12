@@ -297,6 +297,25 @@ Ese `9959687655b2` es el identificador del contenedor, no tu dominio. Next
 escucha en `0.0.0.0` y no sabe nada de `SITE_URL`; el dominio lo resuelve el
 proxy. Que ahí no aparezca tu dominio es lo normal, no es el problema.
 
+### El despliegue falla con "Invalid template"
+
+```
+failed to read /artifacts/build-time.env: Invalid template: "${SITE_URL:-"
+```
+
+Ese error **no viene del repositorio**: viene de una variable guardada en el
+panel cuyo valor quedó a medias. Coolify registra como variables propias las
+que detecta en el compose, y una vez guardadas **ningún cambio en el
+repositorio las corrige**.
+
+Se arregla en el panel, en Environment Variables: borra la variable que
+aparece con un valor tipo `${ALGO:-` y vuelve a desplegar. Si la necesitas,
+déjala con el valor real, nunca con una referencia a otra variable.
+
+Comprobado: con esa variable corrupta el despliegue falla aunque el compose
+ya no la mencione, porque Docker Compose falla al leer el archivo completo.
+Borrarla, o dejarla vacía, basta para que parsee.
+
 ### Los formularios fallan con un error genérico
 
 Si el sitio carga pero entrar, registrarse o inscribirse tira un error sin
@@ -310,11 +329,10 @@ Invalid Server Actions request.
 es la protección contra CSRF de Next: compara el origen del navegador contra
 el encabezado que reenvía el proxy, y si no calzan aborta el envío.
 
-El compose lo resuelve pasando el dominio como argumento de construcción
-`ALLOWED_ORIGINS`, que toma el valor de `SITE_URL`. Con una diferencia
-importante: **Next graba esa lista dentro de la imagen**, así que si cambias
-de dominio hay que **reconstruir**, no solo reiniciar. En Coolify, eso es
-volver a desplegar y no simplemente actualizar la variable.
+El compose lo resuelve pasando `SITE_URL` como argumento de construcción.
+Con una diferencia importante: **Next graba esa lista dentro de la imagen**,
+así que si cambias de dominio hay que **reconstruir**, no solo reiniciar. En
+Coolify, eso es volver a desplegar y no simplemente actualizar la variable.
 
 ### En un VPS sin panel ni proxy
 

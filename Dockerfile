@@ -9,9 +9,7 @@ WORKDIR /app
 # (Next los serializa en required-server-files.json), así que tienen que
 # llegar como argumento de construcción y no como variable de ejecución.
 # Cambiar de dominio obliga a reconstruir la imagen.
-ARG ALLOWED_ORIGINS=""
 ARG SITE_URL=""
-ENV ALLOWED_ORIGINS=$ALLOWED_ORIGINS
 ENV SITE_URL=$SITE_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
