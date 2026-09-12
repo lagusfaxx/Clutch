@@ -16,13 +16,21 @@ RUN npx prisma generate && npm run build
 # cada versión. Que la calcule npm y no nosotros.
 #
 # Se instala solo el CLI y no todas las dependencias de producción: lo primero
-# son 97 MB, lo segundo 742 MB, y acá no hace falta nada más.
+# son 133 MB, lo segundo 742 MB, y acá no hace falta nada más.
+#
+# Sin --ignore-scripts a propósito: ese postinstall es el que descarga los
+# motores de Prisma. Si no corre acá, el CLI intenta descargarlos al arrancar
+# el contenedor, como usuario sin privilegios y sobre una carpeta de solo
+# lectura, y falla con "Can't write to /app/cli/node_modules/@prisma/engines".
+#
+# Esta etapa tiene que usar la MISMA imagen base que la etapa final: los
+# motores son binarios nativos y los de glibc no sirven en musl.
 FROM node:22-alpine AS cli
 WORKDIR /cli
 COPY package.json ./
 RUN VERSION=$(node -p "require('./package.json').dependencies.prisma") \
   && rm package.json \
-  && npm install --no-save --omit=dev --ignore-scripts "prisma@$VERSION" \
+  && npm install --no-save --omit=dev "prisma@$VERSION" \
   && npm cache clean --force
 
 FROM node:22-alpine AS runner
