@@ -305,9 +305,23 @@ Ojo con el detalle del banner de arranque: Next imprime
 - Local:   http://9959687655b2:3000
 ```
 
-Ese `9959687655b2` es el identificador del contenedor, no tu dominio. Next
-escucha en `0.0.0.0` y no sabe nada de `SITE_URL`; el dominio lo resuelve el
-proxy. Que ahí no aparezca tu dominio es lo normal, no es el problema.
+Ese `9959687655b2` es el identificador del contenedor. Que no aparezca tu
+dominio es normal: Next no sabe nada de `SITE_URL`, el dominio lo resuelve el
+proxy.
+
+Lo que NO es normal es que aparezca ahí y no `0.0.0.0`. Esa línea dice en qué
+interfaz quedó escuchando, y el servidor standalone lo decide leyendo la
+variable `HOSTNAME`, que Docker define con el identificador del contenedor. Si
+nadie la fija, Next atiende solo en la IP de una red.
+
+Y desde ahí el fallo no se parece en nada a su causa: el healthcheck pregunta
+por `127.0.0.1`, no encuentra a nadie y el contenedor queda `unhealthy`;
+Traefik descarta los contenedores que no están sanos y no anota nada al
+hacerlo; el dominio responde 404 con las etiquetas de enrutamiento correctas y
+la aplicación corriendo y contestando por dentro. Un 404 con el contenedor
+`unhealthy` se mira por acá antes que por el proxy.
+
+El Dockerfile fija `HOSTNAME=0.0.0.0` en la etapa final para que esto no pase.
 
 ### El despliegue falla con "Invalid template"
 
