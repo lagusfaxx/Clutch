@@ -5,7 +5,7 @@ import { ErrorClutch } from '@/lib/errores'
 import { aSlug } from '@/lib/slug'
 import { cifrar, hashIp } from '@/lib/crypto'
 import { hashearClave, verificarClave, problemaConLaClave } from '@/lib/password'
-import { buscarJugador, hayProveedor } from './fortnite/client'
+import { consultarJugador, hayProveedor } from './fortnite/client'
 import { registrar } from './audit'
 
 export const EDAD_MINIMA = 13
@@ -162,13 +162,37 @@ export async function vincularEpicPorNick(userId: string, nick: string, db: Db =
     )
   }
 
-  const stats = await buscarJugador(limpio, db)
-  if (!stats) {
+  const consulta = await consultarJugador(limpio, db)
+  if (consulta.estado === 'sin-stats') {
+    // Cada motivo manda al jugador a un lado distinto. Decirle "no existe" a
+    // quien tiene el perfil privado lo deja corrigiendo un nick que está bien.
+    if (consulta.motivo === 'privadas') {
+      throw new ErrorClutch(
+        'VALIDACION',
+        `La cuenta "${limpio}" existe, pero tiene las estadísticas privadas y así no podemos verificarla. ` +
+          'Actívalas en Fortnite: Carrera → Ajustes de cuenta y privacidad → Mostrar en tabla de clasificación. ' +
+          'Después vuelve e inténtalo de nuevo.',
+      )
+    }
+    if (consulta.motivo === 'sin-partidas') {
+      throw new ErrorClutch(
+        'VALIDACION',
+        `La cuenta "${limpio}" existe pero todavía no tiene partidas registradas. Juega una y vuelve a intentarlo.`,
+      )
+    }
+    if (consulta.motivo === 'no-disponible') {
+      throw new ErrorClutch(
+        'EXTERNO',
+        'La verificación no está disponible ahora. No es problema tuyo: inténtalo en unos minutos.',
+      )
+    }
     throw new ErrorClutch(
       'NO_ENCONTRADO',
       `No encontramos el nick "${limpio}" en Fortnite. Revisa que esté escrito igual que en el juego.`,
     )
   }
+
+  const { stats } = consulta
   if (!stats.accountId) {
     throw new ErrorClutch('EXTERNO', 'La verificación no está disponible ahora. Inténtalo en unos minutos.')
   }

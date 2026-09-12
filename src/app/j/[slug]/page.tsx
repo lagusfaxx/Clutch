@@ -8,6 +8,9 @@ import { historialDeUsuario } from '@/server/services/ranking'
 import { usuarioActual } from '@/server/auth'
 import { fechaCL } from '@/lib/fechas'
 import { Evolucion } from '@/components/Evolucion'
+import type { MotivoSinStats } from '@/server/services/fortnite/client'
+import { StatsFortnite, AvisoSinStats } from '@/components/StatsFortnite'
+import { leerStatsGuardadas } from '@/server/services/fortnite/guardadas'
 
 export const dynamic = 'force-dynamic'
 
@@ -189,7 +192,8 @@ async function PerfilFantasma({ slug }: { slug: string }) {
   const fantasma = await prisma.ghostProfile.findUnique({ where: { slug } })
   if (!fantasma || fantasma.notFound) notFound()
 
-  const stats = fantasma.cachedStats as { wins?: number; kills?: number; matchesPlayed?: number } | null
+  const stats = leerStatsGuardadas(fantasma.cachedStats)
+  const motivo = fantasma.motivo as MotivoSinStats | null
 
   return (
     <div className="space-y-5">
@@ -201,11 +205,8 @@ async function PerfilFantasma({ slug }: { slug: string }) {
         </p>
       </header>
 
-      <section className="grid gap-px bg-linea sm:grid-cols-3">
-        <Celda titulo="Victorias" valor={stats?.wins ?? null} />
-        <Celda titulo="Eliminaciones" valor={stats?.kills ?? null} />
-        <Celda titulo="Partidas" valor={stats?.matchesPlayed ?? null} />
-      </section>
+      {motivo && <AvisoSinStats motivo={motivo} nick={fantasma.epicNick} />}
+      {stats && <StatsFortnite stats={stats} />}
 
       <section className="bloque p-5">
         <h2 className="text-[13px] font-semibold">¿Este eres tú?</h2>
@@ -222,15 +223,6 @@ async function PerfilFantasma({ slug }: { slug: string }) {
           </Link>
         </div>
       </section>
-    </div>
-  )
-}
-
-function Celda({ titulo, valor }: { titulo: string; valor: number | null }) {
-  return (
-    <div className="bg-panel p-5">
-      <p className="etiqueta">{titulo}</p>
-      <p className="cifra text-cifra">{valor?.toLocaleString('es-CL') ?? '—'}</p>
     </div>
   )
 }

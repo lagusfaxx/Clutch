@@ -38,6 +38,9 @@ const enlaces = [
   { href: '/ranking', texto: 'Ranking' },
   { href: '/torneos', texto: 'Torneos' },
   { href: '/comparar', texto: 'Comparar' },
+  { href: '/tienda', texto: 'Tienda' },
+  { href: '/noticias', texto: 'Novedades' },
+  { href: '/mapa', texto: 'Mapa' },
 ]
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

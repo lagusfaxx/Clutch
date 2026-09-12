@@ -11,7 +11,10 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://cdn.discordapp.com",
+      // Los iconos de la tienda, las portadas de las novedades y el mapa los
+      // sirven los CDN de fortnite-api.com y de Epic. Sin estos orígenes el
+      // navegador los bloquea y las secciones quedan con los huecos vacíos.
+      "img-src 'self' data: blob: https://cdn.discordapp.com https://fortnite-api.com https://cdn.fortnite-api.com https://cdn2.unrealengine.com https://cdn-live.prm.ol.epicgames.com",
       "connect-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",

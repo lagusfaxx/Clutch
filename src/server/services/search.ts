@@ -2,7 +2,8 @@ import { Prisma } from '@prisma/client'
 import type { Db } from '@/lib/prisma'
 import { prisma } from '@/lib/prisma'
 import { aSlug } from '@/lib/slug'
-import { buscarJugador } from './fortnite/client'
+import { consultarJugador } from './fortnite/client'
+import type { MotivoSinStats, StatsJugador } from './fortnite/client'
 
 export type TipoResultado = 'clutch' | 'fantasma' | 'sugerencia'
 
@@ -96,31 +97,55 @@ async function sugerenciasPorSimilitud(termino: string, db: Db): Promise<Resulta
   }))
 }
 
+/** Cuánto vale una respuesta antes de volver a preguntar. */
+const TTL_CON_STATS_MS = 24 * 3_600_000
+/**
+ * Las respuestas sin stats caducan mucho antes: un perfil privado que se
+ * abre, o una cuenta que juega su primera partida, tiene que aparecer el
+ * mismo día y no al siguiente.
+ */
+const TTL_SIN_STATS_MS = 3_600_000
+
 /**
  * Caso 2 de §2.11: existe en Epic pero no compite en Clutch. Genera una
- * página indexable con CTA, no un 404. Caché de 24h incluso en negativo.
+ * página indexable con CTA, no un 404.
+ *
+ * Un perfil con las stats privadas SÍ devuelve resultado: la cuenta existe,
+ * y su página lo explica. Solo desaparecen las que no existen y las que no
+ * tienen ninguna partida.
  */
 export async function buscarOCrearFantasma(nick: string, db: Db = prisma): Promise<ResultadoBusqueda | null> {
   const clave = nick.toLowerCase()
   const guardado = await db.ghostProfile.findUnique({ where: { epicNick: clave } })
 
-  const fresco =
-    guardado?.lastSyncedAt && Date.now() - guardado.lastSyncedAt.getTime() < 24 * 3_600_000
+  const ttl = guardado?.motivo ? TTL_SIN_STATS_MS : TTL_CON_STATS_MS
+  const fresco = guardado?.lastSyncedAt && Date.now() - guardado.lastSyncedAt.getTime() < ttl
 
   if (guardado && fresco) {
     return guardado.notFound ? null : aResultado(guardado)
   }
 
-  const externo = await buscarJugador(nick, db).catch(() => null)
+  const consulta = await consultarJugador(nick, db).catch(
+    () => ({ estado: 'sin-stats', motivo: 'no-disponible' }) as const,
+  )
+  const externo: StatsJugador | null = consulta.estado === 'ok' ? consulta.stats : null
+  const motivo: MotivoSinStats | null = consulta.estado === 'ok' ? null : consulta.motivo
+
+  // Solo se esconde lo que de verdad no hay nada que mostrar. Un perfil
+  // privado tiene página, porque el jugador existe y puede reclamarla; y una
+  // caída del proveedor no puede borrar de la búsqueda a quien ya estaba.
+  const ocultar =
+    motivo === 'no-existe' || motivo === 'sin-partidas' || (motivo === 'no-disponible' && !guardado)
 
   const datos = {
     epicNick: clave,
     slug: guardado?.slug ?? (await slugFantasmaLibre(nick, db)),
     epicAccountId: externo?.accountId ?? guardado?.epicAccountId ?? null,
     cachedStats: externo
-      ? ({ wins: externo.wins, kills: externo.kills, matchesPlayed: externo.matchesPlayed } as object)
-      : Prisma.DbNull,
-    notFound: externo === null,
+      ? ({ nivelPase: externo.nivelPase, detalle: externo.detalle } as object)
+      : (guardado?.cachedStats ?? Prisma.DbNull),
+    motivo,
+    notFound: ocultar,
     lastSyncedAt: new Date(),
   }
 
