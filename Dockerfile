@@ -10,7 +10,9 @@ WORKDIR /app
 # llegar como argumento de construcción y no como variable de ejecución.
 # Cambiar de dominio obliga a reconstruir la imagen.
 ARG ALLOWED_ORIGINS=""
+ARG SITE_URL=""
 ENV ALLOWED_ORIGINS=$ALLOWED_ORIGINS
+ENV SITE_URL=$SITE_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate && npm run build

@@ -29,7 +29,12 @@ const securityHeaders = [
  * request" y el usuario solo ve un error genérico. Declarar acá el dominio
  * evita depender de cómo esté configurado el proxy.
  */
-const origenesPermitidos = (process.env.ALLOWED_ORIGINS ?? process.env.SITE_URL ?? '')
+// El respaldo se resuelve acá y no en el compose: con ARG vacío la variable
+// llega definida pero en blanco, así que `??` no alcanza y hace falta
+// descartar la cadena vacía explícitamente.
+const origenBruto = [process.env.ALLOWED_ORIGINS, process.env.SITE_URL].find((v) => v && v.trim()) ?? ''
+
+const origenesPermitidos = origenBruto
   .split(',')
   .map((o) => o.trim().replace(/^https?:\/\//, '').replace(/\/$/, ''))
   .filter(Boolean)

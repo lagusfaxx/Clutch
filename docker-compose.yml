@@ -42,7 +42,13 @@ services:
         # vacío y el proxy no reenvía x-forwarded-host con el dominio
         # público, Next rechaza cada formulario con "Invalid Server Actions
         # request" y el usuario solo ve un error genérico.
-        ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-${SITE_URL:-}}
+        #
+        # Van como dos variables sueltas y el respaldo se resuelve en
+        # next.config. Anidar una sustitución dentro del valor por defecto de
+        # otra rompe el lector de archivos .env con "Invalid template", así
+        # que acá no puede haber sustituciones anidadas ni en los comentarios.
+        ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+        SITE_URL: ${SITE_URL:-}
     restart: unless-stopped
     depends_on:
       db:
