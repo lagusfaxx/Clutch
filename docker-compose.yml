@@ -53,30 +53,35 @@ services:
       db:
         condition: service_healthy
     environment:
-      # Esta primera línea no es una variable más: es la señal que Coolify
+      # Esta primera clave no es una variable más: es la señal que Coolify
       # busca para saber que este servicio se publica en el puerto 3000, y
       # con eso genera las etiquetas de Traefik. Va SIN valor a propósito.
       # Escribirla como `CLAVE: algo` la convierte en una variable corriente
       # y el proxy se queda sin ruta, que es el 404 de "page not found".
-      - SERVICE_FQDN_APP_3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-clutch}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-clutch}
-      - AUTH_SECRET=${AUTH_SECRET:?define AUTH_SECRET en el .env}
-      - AUTH_URL=${AUTH_URL:-http://localhost:3000}
-      - SITE_URL=${SITE_URL:-http://localhost:3000}
-      - FORTNITE_API_KEY=${FORTNITE_API_KEY:-}
-      - FORTNITE_API_IO_KEY=${FORTNITE_API_IO_KEY:-}
-      - PRIZE_ENCRYPTION_KEY=${PRIZE_ENCRYPTION_KEY:-}
-      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-}
-      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET:-}
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
-      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID:-}
-      - DISCORD_CANAL_TORNEOS=${DISCORD_CANAL_TORNEOS:-}
-      - TBK_COMMERCE_CODE=${TBK_COMMERCE_CODE:-}
-      - TBK_API_KEY=${TBK_API_KEY:-}
-      - TBK_AMBIENTE=${TBK_AMBIENTE:-integracion}
+      #
+      # Y va en un bloque de mapa, no de lista: Coolify vuelve a escribir
+      # este archivo antes de construir, y una entrada suelta de lista (sin
+      # `=`) la reescribe con la posición como clave, lo que revienta el
+      # despliegue con "non-string key in services.app.environment: 0".
+      SERVICE_FQDN_APP_3000:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-clutch}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-clutch}
+      AUTH_SECRET: ${AUTH_SECRET:?define AUTH_SECRET en el .env}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      FORTNITE_API_KEY: ${FORTNITE_API_KEY:-}
+      FORTNITE_API_IO_KEY: ${FORTNITE_API_IO_KEY:-}
+      PRIZE_ENCRYPTION_KEY: ${PRIZE_ENCRYPTION_KEY:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_CANAL_TORNEOS: ${DISCORD_CANAL_TORNEOS:-}
+      TBK_COMMERCE_CODE: ${TBK_COMMERCE_CODE:-}
+      TBK_API_KEY: ${TBK_API_KEY:-}
+      TBK_AMBIENTE: ${TBK_AMBIENTE:-integracion}
       # Una sola instancia corre la cola y el bot. Si algún día escalas a
       # varias, esto va en true en una sola.
-      - RUN_BACKGROUND=true
+      RUN_BACKGROUND: 'true'
     # Sin `ports` a propósito.
     #
     # Detrás de un proxy (Traefik en Coolify, o nginx propio), publicar el
