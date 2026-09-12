@@ -1,6 +1,7 @@
 import type PgBoss from 'pg-boss'
 import { prisma } from '@/lib/prisma'
 import { TRABAJOS } from './nombres'
+import { asegurarCola } from './boss'
 import { cerrarCheckIn, promoverListaEspera } from '../services/registration'
 import { aplicarTorneoAlRanking, aplicarDecayGlobal } from '../services/ranking'
 import { capturarTorneo } from '../services/fortnite/snapshot'
@@ -31,6 +32,9 @@ function idTorneo(datos: Datos): string {
  * el resultado tiene que ser el mismo.
  */
 export async function registrarTrabajos(b: PgBoss): Promise<void> {
+  // Todas las colas existen antes de agendar o escuchar nada.
+  for (const nombre of Object.values(TRABAJOS)) await asegurarCola(nombre, b)
+
   const trabajar = async (nombre: string, fn: (datos: Datos) => Promise<void>) => {
     await b.work<Datos>(nombre, async (jobs) => {
       for (const job of jobs) {
@@ -156,6 +160,7 @@ export async function agendarTorneo(
   torneo: { id: string; startsAt: Date; endsAt: Date; checkInOpensAt: Date },
 ): Promise<void> {
   const enviar = async (nombre: string, cuando: Date, sufijo: string) => {
+    await asegurarCola(nombre, b)
     await b.send(
       nombre,
       { tournamentId: torneo.id },

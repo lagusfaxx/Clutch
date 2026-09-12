@@ -24,8 +24,28 @@ export async function boss(): Promise<PgBoss> {
   return instancia
 }
 
+const colasCreadas = new Set<string>()
+
+/**
+ * pg-boss v10 no crea la cola sola: agendar o encolar contra una cola
+ * inexistente falla por llave foránea. Esto es idempotente y se cachea en
+ * memoria para no golpear la base en cada envío.
+ */
+export async function asegurarCola(nombre: string, b?: PgBoss): Promise<void> {
+  if (colasCreadas.has(nombre)) return
+  const cola = b ?? (await boss())
+  try {
+    await cola.createQueue(nombre)
+  } catch (e) {
+    // Otra réplica la creó primero: es el resultado que queríamos igual.
+    if (!(e instanceof Error) || !/already exists|duplicate key/i.test(e.message)) throw e
+  }
+  colasCreadas.add(nombre)
+}
+
 export async function encolar(nombre: string, datos: Record<string, unknown>, opciones?: PgBoss.SendOptions) {
   const b = await boss()
+  await asegurarCola(nombre, b)
   return b.send(nombre, datos, opciones ?? {})
 }
 

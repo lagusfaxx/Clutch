@@ -7,8 +7,8 @@ API-first: la web y la app móvil futura consumen los mismos servicios.
 
 Un solo servicio de Next.js 15 (App Router) sobre PostgreSQL. En el mismo
 proceso Node corren las páginas, la API `/api/v1`, el worker de colas
-(pg-boss) y el bot de Discord, arrancados desde `instrumentation.ts` cuando
-`RUN_BACKGROUND=true`. Sin Redis, sin backend separado, sin docker-compose.
+(pg-boss) y el bot de Discord, arrancados desde `src/instrumentation.ts`
+cuando `RUN_BACKGROUND=true`. Sin Redis, sin backend separado, sin docker-compose.
 
 ```
 src/server/services/*     lógica de negocio pura, no importa nada de Next
@@ -16,6 +16,7 @@ src/app/api/v1/*          REST versionado para la app móvil
 src/app/**/actions.ts     Server Actions, cáscaras finas sobre los servicios
 src/server/jobs/*         cola pg-boss sobre el mismo Postgres
 src/server/discord/*      bot y anuncios
+src/instrumentation.ts    arranque del worker y del bot
 ```
 
 Regla no negociable: si hay lógica de negocio dentro de un componente o de
@@ -40,7 +41,11 @@ Comandos útiles:
 npm run typecheck        # TypeScript estricto, con noUncheckedIndexedAccess
 npm test                 # lógica pura: Glicko-2, puntaje, RUT, cifrado, CS2
 npm run check:ai-smell   # controles de §7 antes de desplegar
+npm run test:humo        # flujo completo de un torneo contra una base real
 ```
+
+`test:humo` necesita una base con las migraciones aplicadas y escribe datos
+de prueba, así que no se corre contra producción.
 
 ## Deploy en Coolify
 

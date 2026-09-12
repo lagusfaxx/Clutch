@@ -1,13 +1,17 @@
 /**
  * Corre una vez al levantar el servidor, antes de atender requests.
  * Web, API, cola y bot viven en el mismo proceso Node (§5).
+ *
+ * Tiene que vivir en src/, al lado de app/: con carpeta src, Next ignora
+ * un instrumentation.ts puesto en la raíz del repositorio y el worker nunca
+ * arranca, sin ningún error visible.
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
   if (process.env.RUN_BACKGROUND !== 'true') return
 
-  const { startWorkers, stopWorkers } = await import('./src/server/jobs/boss')
-  const { startBot, stopBot } = await import('./src/server/discord/bot')
+  const { startWorkers, stopWorkers } = await import('@/server/jobs/boss')
+  const { startBot, stopBot } = await import('@/server/discord/bot')
 
   await startWorkers()
   await startBot()
