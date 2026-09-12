@@ -1,0 +1,66 @@
+# Despliegue en un VPS con Docker, sin panel de por medio.
+#
+#   cp .env.example .env    # completa AUTH_SECRET, FORTNITE_API_KEY y las demás
+#   docker compose up -d --build
+#
+# Las migraciones corren solas al levantar la aplicación. Para Coolify no
+# hace falta este archivo: ahí se usa el Dockerfile y un PostgreSQL
+# gestionado por el panel, que además te da los respaldos programados.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clutch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env}
+      POSTGRES_DB: ${POSTGRES_DB:-clutch}
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+      # Los respaldos caen acá. Súbelos a otra parte: un respaldo en el mismo
+      # servidor que la base no es un respaldo.
+      - ./respaldos:/respaldos
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-clutch} -d ${POSTGRES_DB:-clutch}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # Sin puertos publicados: la base solo se ve desde la red interna.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-clutch}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-clutch}
+      AUTH_SECRET: ${AUTH_SECRET:?define AUTH_SECRET en el .env}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      FORTNITE_API_KEY: ${FORTNITE_API_KEY:-}
+      FORTNITE_API_IO_KEY: ${FORTNITE_API_IO_KEY:-}
+      PRIZE_ENCRYPTION_KEY: ${PRIZE_ENCRYPTION_KEY:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_CANAL_TORNEOS: ${DISCORD_CANAL_TORNEOS:-}
+      TBK_COMMERCE_CODE: ${TBK_COMMERCE_CODE:-}
+      TBK_API_KEY: ${TBK_API_KEY:-}
+      TBK_AMBIENTE: ${TBK_AMBIENTE:-integracion}
+      # Una sola instancia corre la cola y el bot. Si algún día escalas a
+      # varias, esto va en true en una sola.
+      RUN_BACKGROUND: 'true'
+    ports:
+      - '${PUERTO:-3000}:3000'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  datos_postgres:

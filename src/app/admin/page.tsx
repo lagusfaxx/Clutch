@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { colaRevision } from '@/server/services/result'
 import { fechaCL, dias } from '@/lib/fechas'
-import { FormularioResolucion, BotonResultado } from '@/components/AdminControles'
+import { FormularioResolucion, BotonResultado, FormularioEpicManual } from '@/components/AdminControles'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +25,7 @@ async function metricas() {
 }
 
 export default async function AdminPage() {
-  const [m, cola, disputas, reportes] = await Promise.all([
+  const [m, cola, disputas, reportes, sinVerificar] = await Promise.all([
     metricas(),
     colaRevision(),
     prisma.dispute.findMany({
@@ -42,6 +42,12 @@ export default async function AdminPage() {
         reporter: { select: { displayName: true } },
         reported: { select: { displayName: true, slug: true } },
       },
+      orderBy: { createdAt: 'asc' },
+      take: 30,
+    }),
+    prisma.user.findMany({
+      where: { status: 'PENDING', deletedAt: null },
+      select: { id: true, displayName: true, email: true, epicNick: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
       take: 30,
     }),
@@ -134,6 +140,44 @@ export default async function AdminPage() {
               </article>
             ))}
           </div>
+        )}
+      </section>
+
+      <section className="bloque p-5">
+        <h2 className="mb-3 text-[13px] font-semibold text-humo">
+          Cuentas sin nick verificado ({sinVerificar.length})
+        </h2>
+        <p className="mb-3 max-w-[70ch] text-[12px] text-humo">
+          No pueden inscribirse a torneos. Si la API no resuelve su nick, busca el accountId en el dashboard de
+          fortnite-api.com y verifícalo acá. Queda registrado como verificación manual.
+        </p>
+        {sinVerificar.length === 0 ? (
+          <p className="text-[13px] text-humo">Ninguna pendiente.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Jugador</th>
+                <th>Correo</th>
+                <th>Nick declarado</th>
+                <th className="num">Se registró</th>
+                <th>Verificar a mano</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sinVerificar.map((u) => (
+                <tr key={u.id}>
+                  <td className="font-medium">{u.displayName}</td>
+                  <td className="text-humo">{u.email ?? 'sin correo'}</td>
+                  <td className="text-humo">{u.epicNick ?? 'no declaró'}</td>
+                  <td className="num cifra text-humo">{fechaCL(u.createdAt)}</td>
+                  <td>
+                    <FormularioEpicManual userId={u.id} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
 

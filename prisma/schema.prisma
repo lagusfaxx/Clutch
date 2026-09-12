@@ -1,10 +1,14 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  // pg_trgm sostiene la búsqueda difusa de nicks (§2.11). Declararla acá
+  // evita que cada migración nueva borre los índices GIN por no conocerlos.
+  extensions = [pg_trgm]
 }
 
 // ----------------------------------------------------------------------------
@@ -118,13 +122,20 @@ enum DisputeStatus {
 
 model User {
   id            String     @id @default(cuid())
-  discordId     String     @unique
+  /// Opcional: el login primario hoy es email y contraseña. Discord queda
+  /// disponible para vincular la cuenta y recibir avisos del bot.
+  discordId     String?    @unique
   discordTag    String?
+  email         String?    @unique
+  passwordHash  String?
+  emailVerifiedAt DateTime?
   epicAccountId String?    @unique
   epicNick      String?
+  /// Cómo se comprobó la cuenta de Epic: API (lookup por nick), ADMIN
+  /// (verificación manual) u OAUTH si algún día vuelve Epic Account Services.
+  epicLinkMethod String?
   displayName   String
   slug          String     @unique
-  email         String?    @unique
   rut           String?    @unique
   birthDate     DateTime?
   guardianEmail String?
@@ -160,6 +171,8 @@ model User {
 
   @@index([status])
   @@index([region])
+  @@index([displayName(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([epicNick(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// Tokens OAuth (Epic Account Services, Discord). Cifrados en reposo.
@@ -284,6 +297,8 @@ model Team {
 
   members       TeamMember[]
   registrations Registration[]
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model TeamMember {
@@ -597,7 +612,7 @@ model GhostProfile {
   claimedByUserId String?   @unique
   createdAt       DateTime  @default(now())
 
-  @@index([epicNick])
+  @@index([epicNick(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model SearchQuery {

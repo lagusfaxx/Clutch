@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { accionResolverResultado, accionResolverDisputa, accionPublicarTorneo, accionAsignarPremios } from '@/app/admin/actions'
+import {
+  accionResolverResultado,
+  accionResolverDisputa,
+  accionPublicarTorneo,
+  accionAsignarPremios,
+  accionVincularEpicManual,
+} from '@/app/admin/actions'
 
 type Respuesta = { ok: true; mensaje?: string } | { ok: false; mensaje: string }
 
@@ -96,5 +102,30 @@ export function BotonAsignarPremios({ torneoId }: { torneoId: string }) {
       </button>
       {mensaje && <span className="ml-2 text-[11px] text-brasa">{mensaje}</span>}
     </span>
+  )
+}
+
+export function FormularioEpicManual({ userId }: { userId: string }) {
+  const { mensaje, pendiente, correr } = useAccion()
+  return (
+    <form action={(datos) => correr(() => accionVincularEpicManual(datos))} className="flex flex-wrap gap-2">
+      <input type="hidden" name="userId" value={userId} />
+      <input
+        name="epicNick"
+        required
+        placeholder="Nick de Epic"
+        className="w-[130px] border border-linea bg-carbon px-2 py-1 text-[13px]"
+      />
+      <input
+        name="epicAccountId"
+        required
+        placeholder="accountId"
+        className="w-[160px] border border-linea bg-carbon px-2 py-1 text-[13px]"
+      />
+      <button className="boton-plano px-2 py-1 text-[12px]" disabled={pendiente}>
+        Verificar
+      </button>
+      {mensaje && <span className="text-[11px] text-brasa">{mensaje}</span>}
+    </form>
   )
 }

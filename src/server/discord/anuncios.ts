@@ -38,13 +38,16 @@ export async function dmCheckIn(tournamentId: string): Promise<number> {
   const torneo = await prisma.tournament.findUnique({ where: { id: tournamentId } })
   if (!cliente || !torneo) return 0
 
+  // Solo quien vinculó Discord recibe el DM. Con login por correo, muchos
+  // inscritos no lo tendrán, y eso no puede romper el recordatorio del resto.
   const inscritos = await prisma.registration.findMany({
-    where: { tournamentId, deletedAt: null, status: 'CONFIRMADA' },
+    where: { tournamentId, deletedAt: null, status: 'CONFIRMADA', user: { discordId: { not: null } } },
     include: { user: { select: { discordId: true } } },
   })
 
   let enviados = 0
   for (const reg of inscritos) {
+    if (!reg.user.discordId) continue
     const usuario = await cliente.users.fetch(reg.user.discordId).catch(() => null)
     if (!usuario) continue
     await usuario
@@ -93,7 +96,7 @@ export async function sincronizarRoles(): Promise<number> {
 
   const tabla = await tablaPublica({ game: 'FORTNITE', limite: 50 })
   const usuarios = await prisma.user.findMany({
-    where: { id: { in: tabla.map((f) => f.userId) } },
+    where: { id: { in: tabla.map((f) => f.userId) }, discordId: { not: null } },
     select: { id: true, discordId: true },
   })
   const discordPorUser = new Map(usuarios.map((u) => [u.id, u.discordId]))

@@ -185,7 +185,13 @@ export async function buscarJugador(nick: string, db: Db = prisma): Promise<Stat
   return null
 }
 
+/** ¿Hay al menos un proveedor configurado? Sin key no hay verificación. */
+export function hayProveedor(): boolean {
+  return Boolean(process.env.FORTNITE_API_KEY ?? process.env.FORTNITE_API_IO_KEY)
+}
+
 export async function verificacionDisponible(db: Db = prisma): Promise<boolean> {
+  if (!hayProveedor()) return false
   const [a, b] = await Promise.all([estaCaido('fortnite-api', db), estaCaido('fortniteapi-io', db)])
   return !(a && b)
 }

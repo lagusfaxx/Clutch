@@ -73,7 +73,7 @@ export default async function Home() {
             <>
               <h1 className="text-marcador">Sin torneos agendados</h1>
               <p className="mt-3 text-[13px] text-humo">
-                Estamos armando la próxima fecha. Entra con Discord y te avisamos cuando abran las inscripciones.
+                Estamos armando la próxima fecha. Crea tu cuenta y te avisamos cuando abran las inscripciones.
               </p>
             </>
           )}

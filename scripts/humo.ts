@@ -12,14 +12,66 @@ import { reportarResultado } from '@/server/services/result'
 import { tablaTorneo } from '@/server/services/tournament'
 import { aplicarTorneoAlRanking, tablaPublica } from '@/server/services/ranking'
 import { asignarPremios, cargarCodigos, revelarCodigo } from '@/server/services/prize'
-import { guardarRut } from '@/server/services/user'
+import { guardarRut, registrarConEmail, autenticarConEmail, cambiarClave } from '@/server/services/user'
 import { compararJugadores } from '@/server/services/compare'
 import { buscar } from '@/server/services/search'
 
 const ok = (m: string) => console.log(`  ok  ${m}`)
 
+/**
+ * Deja el torneo de prueba como recién creado. Sin esto el script solo
+ * corre una vez: la segunda encuentra el torneo cerrado y falla.
+ */
+async function reiniciar(slug: string) {
+  const torneo = await prisma.tournament.findUniqueOrThrow({ where: { slug } })
+  await prisma.matchResult.deleteMany({ where: { match: { tournamentId: torneo.id } } })
+  await prisma.ratingHistory.deleteMany({ where: { tournamentId: torneo.id } })
+  await prisma.registration.deleteMany({ where: { tournamentId: torneo.id } })
+  await prisma.prizeCode.deleteMany({})
+  await prisma.prizeClaim.deleteMany({ where: { prize: { tournamentId: torneo.id } } })
+  await prisma.rating.deleteMany({})
+  await prisma.strike.deleteMany({})
+  await prisma.auditLog.deleteMany({})
+
+  const parte = new Date(Date.now() + 3 * 86_400_000)
+  return prisma.tournament.update({
+    where: { id: torneo.id },
+    data: {
+      status: 'INSCRIPCION_ABIERTA',
+      startsAt: parte,
+      endsAt: new Date(parte.getTime() + 3 * 3_600_000),
+      checkInOpensAt: new Date(parte.getTime() - 30 * 60_000),
+    },
+  })
+}
+
 async function main() {
-  const torneo = await prisma.tournament.findUniqueOrThrow({ where: { slug: 'semanal-solo-1' } })
+  const torneo = await reiniciar('semanal-solo-1')
+
+  console.log('\n0. Registro con correo y contraseña')
+  await prisma.user.deleteMany({ where: { email: 'prueba@clutch.cl' } })
+  const registrado = await registrarConEmail({
+    email: 'Prueba@Clutch.CL',
+    password: 'una clave larga y decente',
+    displayName: 'jugador de prueba',
+  })
+  ok(`creado ${registrado.email} en estado ${registrado.status}`)
+  ok(`login correcto: ${Boolean(await autenticarConEmail('prueba@clutch.cl', 'una clave larga y decente'))}`)
+  ok(`login con clave mala: ${await autenticarConEmail('prueba@clutch.cl', 'otra cosa')}`)
+  try {
+    await registrarConEmail({ email: 'prueba@clutch.cl', password: 'otra clave larguisima', displayName: 'clon' })
+    console.log('  FALLA: dejó repetir el correo')
+  } catch (e) {
+    ok(`correo repetido rechazado: ${(e as Error).message}`)
+  }
+  try {
+    await registrarConEmail({ email: 'corta@clutch.cl', password: 'corta', displayName: 'corta' })
+    console.log('  FALLA: aceptó una clave corta')
+  } catch (e) {
+    ok(`clave corta rechazada: ${(e as Error).message}`)
+  }
+  await cambiarClave(registrado.id, 'una clave larga y decente', 'otra clave todavia mejor')
+  ok(`clave cambiada, login nuevo: ${Boolean(await autenticarConEmail('prueba@clutch.cl', 'otra clave todavia mejor'))}`)
 
   console.log('\n1. Crear jugadores')
   const nombres = ['vatoloco', 'kiltro', 'pelao_cl', 'tomate', 'chascon', 'weon_pro']
@@ -38,15 +90,10 @@ async function main() {
   }
   ok(`${jugadores.length} jugadores`)
 
-  console.log('\n2. Inscripción (debe exigir Epic vinculado)')
-  const sinEpic = await prisma.user.upsert({
-    where: { discordId: 'd-sinepic' },
-    create: { discordId: 'd-sinepic', displayName: 'sinepic', slug: 'sinepic', status: 'PENDING' },
-    update: {},
-  })
+  console.log('\n2. Inscripción (debe exigir nick de Epic confirmado)')
   try {
-    await inscribir(torneo.id, sinEpic.id)
-    console.log('  FALLA: dejó inscribirse sin Epic')
+    await inscribir(torneo.id, registrado.id)
+    console.log('  FALLA: dejó inscribirse sin nick confirmado')
   } catch (e) {
     ok(`rechazado: ${(e as Error).message}`)
   }

@@ -23,7 +23,48 @@ Regla no negociable: si hay lógica de negocio dentro de un componente o de
 una Server Action, está mal. Esa separación es lo que permite mover el
 worker a un segundo servicio el día que el CPU se note, sin reescribir nada.
 
-## Levantarlo local
+## Cuentas y verificación
+
+El login es **correo y contraseña**. Las contraseñas se guardan con scrypt
+del propio Node, sin dependencias nativas que compilar.
+
+Epic Account Services está fuera por ahora, así que la cuenta de Fortnite se
+comprueba resolviendo el nick contra fortnite-api.com y guardando el
+`accountId` que devuelve, con constraint único. Conviene tener claro qué
+garantiza eso y qué no: asegura que **una cuenta de Fortnite valga por una
+sola cuenta de Clutch**, que es lo que corta el grueso del smurfing, pero no
+prueba que quien se registra sea el dueño de esa cuenta. Solo el OAuth de
+Epic puede afirmar eso, y el código para volver a enchufarlo sigue en
+`vincularEpic()` esperando el método `OAUTH`.
+
+Sin nick confirmado se puede mirar todo el sitio, pero no inscribirse a
+ningún torneo.
+
+Discord queda como vínculo opcional para el bot: anuncios, recordatorios de
+check-in por mensaje directo y roles por tramo de ranking.
+
+## Levantarlo con docker compose
+
+La forma más corta de tenerlo andando en un VPS:
+
+```bash
+cp .env.example .env    # completa AUTH_SECRET, POSTGRES_PASSWORD, FORTNITE_API_KEY
+docker compose up -d --build
+```
+
+Levanta la aplicación y PostgreSQL, aplica las migraciones sola y deja el
+sitio en el puerto 3000. La base no publica puertos: solo se ve desde la red
+interna de compose.
+
+Para generar los secretos: `openssl rand -base64 32`.
+
+Con compose los respaldos son tuyos. `./respaldos` está montado dentro del
+contenedor de la base para que `pg_dump` escriba ahí, pero tienes que
+programarlo y **subirlo a otra parte**: un respaldo en el mismo servidor que
+la base no es un respaldo. Si prefieres no hacerte cargo de eso, usa Coolify
+con su PostgreSQL gestionado, que trae respaldos programados.
+
+## Levantarlo local sin Docker
 
 ```bash
 cp .env.example .env          # completa DATABASE_URL y AUTH_SECRET
@@ -32,8 +73,6 @@ npx prisma migrate deploy     # incluye la extensión pg_trgm
 npm run db:seed               # temporada y torneo de ejemplo
 npm run dev
 ```
-
-Para generar la clave de cifrado de premios: `openssl rand -base64 32`.
 
 Comandos útiles:
 
@@ -51,7 +90,8 @@ de prueba, así que no se corre contra producción.
 
 Dos recursos: la aplicación (build por Dockerfile) y un PostgreSQL
 gestionado, con backup programado a almacenamiento externo desde el día uno.
-Un backup en el mismo VPS no es un backup.
+Un backup en el mismo VPS no es un backup. El `docker-compose.yml` no se usa
+en este camino.
 
 ```
 Dominio:       clutch.cl (TLS por Traefik). api.clutch.cl apunta al mismo contenedor.
@@ -68,12 +108,10 @@ locking de los jobs, el bot no.
 
 ## Integración con Fortnite
 
-Epic Account Services (OAuth oficial) entrega identidad: `accountId` y
-`displayName`. Nada de stats. Eso es todo lo garantizado a largo plazo, y es
-justamente lo que sostiene el anti-smurf de una cuenta Epic por cuenta Clutch.
-
 Las stats vienen de APIs no oficiales: `fortnite-api.com` como primario
-(`FORTNITE_API_KEY`) y `fortniteapi.io` como fallback. Cliente propio con Zod
+(`FORTNITE_API_KEY`) y `fortniteapi.io` como fallback. Son dos servicios
+distintos con cuentas distintas: `FORTNITE_API_IO_KEY` puede quedar vacía y
+el sistema ni intenta el fallback. Cliente propio con Zod
 en cada respuesta, caché de 15 minutos, circuit breaker de 5 fallos por 10
 minutos y timeout de 5 segundos. Si los dos caen, la UI avisa que la
 verificación automática no está disponible y el torneo sigue con reporte

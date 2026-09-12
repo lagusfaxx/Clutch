@@ -97,7 +97,7 @@ export default async function TorneoPage({ params }: { params: Promise<{ slug: s
             />
           ) : (
             <Link href="/entrar" className="boton">
-              Entra con Discord para inscribirte
+              Entra para inscribirte
             </Link>
           )}
         </div>

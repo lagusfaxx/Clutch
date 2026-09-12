@@ -18,7 +18,7 @@ type Respuesta = { ok: true } | { ok: false; mensaje: string }
 
 async function ejecutar(fn: (userId: string) => Promise<unknown>, ruta: string): Promise<Respuesta> {
   const usuario = await usuarioActual()
-  if (!usuario) return { ok: false, mensaje: 'Tienes que iniciar sesión con Discord.' }
+  if (!usuario) return { ok: false, mensaje: 'Tienes que iniciar sesión.' }
   try {
     await fn(usuario.id)
     revalidatePath(ruta)

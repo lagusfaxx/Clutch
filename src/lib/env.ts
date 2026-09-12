@@ -14,8 +14,6 @@ const esquema = z.object({
   DISCORD_BOT_TOKEN: z.string().optional(),
   DISCORD_GUILD_ID: z.string().optional(),
   DISCORD_CANAL_TORNEOS: z.string().optional(),
-  EPIC_CLIENT_ID: z.string().optional(),
-  EPIC_CLIENT_SECRET: z.string().optional(),
   FORTNITE_API_KEY: z.string().optional(),
   FORTNITE_API_IO_KEY: z.string().optional(),
   PRIZE_ENCRYPTION_KEY: z.string().optional(),

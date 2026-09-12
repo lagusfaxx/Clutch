@@ -18,6 +18,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     uid?: string
     slug?: string
+    nombre?: string
     estado?: string
     admin?: boolean
   }

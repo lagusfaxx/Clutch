@@ -9,8 +9,8 @@ const secciones = [
   {
     titulo: 'Cuentas',
     puntos: [
-      'Entras con Discord y vinculas tu cuenta de Epic. Sin Epic vinculada no puedes inscribirte.',
-      'Una cuenta de Epic vale por una sola cuenta de Clutch. Las cuentas duplicadas se cierran.',
+      'Te registras con tu correo y confirmas tu nick de Epic. Sin ese nick confirmado no puedes inscribirte.',
+      'Una cuenta de Fortnite vale por una sola cuenta de Clutch. Las cuentas duplicadas se cierran.',
       'Edad mínima 13 años. Si tienes menos de 18, para reclamar un premio físico necesitamos el email de tu apoderado.',
       'El RUT se pide recién al momento de entregar un premio, para dejar registro de la entrega.',
     ],

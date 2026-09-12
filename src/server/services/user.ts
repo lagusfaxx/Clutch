@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { ErrorClutch } from '@/lib/errores'
 import { aSlug } from '@/lib/slug'
 import { cifrar, hashIp } from '@/lib/crypto'
+import { hashearClave, verificarClave, problemaConLaClave } from '@/lib/password'
+import { buscarJugador, hayProveedor } from './fortnite/client'
 import { registrar } from './audit'
 
 export const EDAD_MINIMA = 13
@@ -51,6 +53,149 @@ async function slugLibre(base: string, db: Db): Promise<string> {
     n += 1
   }
   return intento
+}
+
+export const esquemaRegistro = z.object({
+  email: z.string().email('Ese correo no parece válido.'),
+  password: z.string(),
+  displayName: z.string().min(2, 'El nombre necesita al menos 2 caracteres.').max(40),
+  epicNick: z.string().min(3).max(40).optional(),
+  birthDate: z.coerce.date().optional(),
+  region: z.string().max(40).optional(),
+})
+
+export type DatosRegistro = z.infer<typeof esquemaRegistro>
+
+function normalizarEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+/**
+ * Registro con correo y contraseña. La cuenta nace en PENDING: para
+ * inscribirse a un torneo hay que confirmar el nick de Epic (§2.1).
+ */
+export async function registrarConEmail(datos: DatosRegistro, db: Db = prisma) {
+  const d = esquemaRegistro.parse(datos)
+
+  const problema = problemaConLaClave(d.password)
+  if (problema) throw new ErrorClutch('VALIDACION', problema)
+  if (d.birthDate && edad(d.birthDate) < EDAD_MINIMA) {
+    throw new ErrorClutch('PROHIBIDO', `Para competir en Clutch tienes que tener ${EDAD_MINIMA} años o más.`)
+  }
+
+  const email = normalizarEmail(d.email)
+  const tomado = await db.user.findUnique({ where: { email } })
+  if (tomado) throw new ErrorClutch('CONFLICTO', 'Ya hay una cuenta con ese correo.')
+
+  const usuario = await db.user.create({
+    data: {
+      email,
+      passwordHash: await hashearClave(d.password),
+      displayName: d.displayName,
+      slug: await slugLibre(d.displayName, db),
+      birthDate: d.birthDate ?? null,
+      region: d.region ?? null,
+      status: 'PENDING',
+    },
+  })
+
+  await registrar(
+    { actorId: usuario.id, action: 'usuario.registrar', entityType: 'User', entityId: usuario.id },
+    db,
+  )
+
+  // Si vino con nick, se intenta confirmar de una: un paso menos.
+  if (d.epicNick) {
+    await vincularEpicPorNick(usuario.id, d.epicNick, db).catch(() => undefined)
+  }
+  return db.user.findUniqueOrThrow({ where: { id: usuario.id } })
+}
+
+/**
+ * Login. Devuelve null en cualquier caso de fracaso, sin distinguir entre
+ * correo inexistente y contraseña mala: decir cuál de los dos falló le
+ * regala a un atacante la lista de correos registrados.
+ */
+export async function autenticarConEmail(email: string, password: string, db: Db = prisma) {
+  const usuario = await db.user.findUnique({ where: { email: normalizarEmail(email) } })
+  if (!usuario?.passwordHash || usuario.deletedAt) return null
+  if (!(await verificarClave(password, usuario.passwordHash))) return null
+  if (usuario.status === 'BANNED') throw new ErrorClutch('PROHIBIDO', 'Tu cuenta está suspendida.')
+  return usuario
+}
+
+export async function cambiarClave(userId: string, actual: string, nueva: string, db: Db = prisma) {
+  const usuario = await db.user.findUnique({ where: { id: userId } })
+  if (!usuario?.passwordHash) throw new ErrorClutch('NO_ENCONTRADO', 'Esa cuenta no existe.')
+  if (!(await verificarClave(actual, usuario.passwordHash))) {
+    throw new ErrorClutch('PROHIBIDO', 'La contraseña actual no coincide.')
+  }
+  const problema = problemaConLaClave(nueva)
+  if (problema) throw new ErrorClutch('VALIDACION', problema)
+
+  await db.user.update({ where: { id: userId }, data: { passwordHash: await hashearClave(nueva) } })
+  await registrar({ actorId: userId, action: 'usuario.cambiar_clave', entityType: 'User', entityId: userId }, db)
+}
+
+/**
+ * Sustituto de Epic OAuth mientras no esté disponible: se resuelve el nick
+ * contra fortnite-api.com y se guarda el accountId que devuelve, con
+ * constraint único.
+ *
+ * Ojo con lo que esto sí y no garantiza: asegura que una cuenta de Fortnite
+ * corresponda a una sola cuenta de Clutch, que es lo que corta el grueso del
+ * smurfing. No prueba que quien registra sea el dueño de esa cuenta, cosa
+ * que solo el OAuth de Epic puede afirmar.
+ */
+export async function vincularEpicPorNick(userId: string, nick: string, db: Db = prisma) {
+  const limpio = nick.trim()
+  if (limpio.length < 3) throw new ErrorClutch('VALIDACION', 'Escribe tu nick de Epic completo.')
+
+  // Sin proveedor configurado el lookup devuelve null igual que un nick
+  // inexistente. Decirle al jugador que su nick no existe cuando el que
+  // está mal configurado es el servidor manda a soporte a gente que no
+  // tiene ningún problema.
+  if (!hayProveedor()) {
+    throw new ErrorClutch(
+      'EXTERNO',
+      'La verificación de nicks no está disponible ahora. No es problema tuyo: escríbenos y te la activamos a mano.',
+    )
+  }
+
+  const stats = await buscarJugador(limpio, db)
+  if (!stats) {
+    throw new ErrorClutch(
+      'NO_ENCONTRADO',
+      `No encontramos el nick "${limpio}" en Fortnite. Revisa que esté escrito igual que en el juego.`,
+    )
+  }
+  if (!stats.accountId) {
+    throw new ErrorClutch('EXTERNO', 'La verificación no está disponible ahora. Inténtalo en unos minutos.')
+  }
+
+  return vincularEpic(userId, { epicAccountId: stats.accountId, epicNick: stats.nick }, db, 'API')
+}
+
+/** Verificación manual desde el panel, para cuando la API no responde. */
+export async function vincularEpicManual(
+  userId: string,
+  epicAccountId: string,
+  epicNick: string,
+  adminId: string,
+  db: Db = prisma,
+) {
+  const usuario = await vincularEpic(userId, { epicAccountId, epicNick }, db, 'ADMIN')
+  await registrar(
+    {
+      actorId: adminId,
+      action: 'usuario.vincular_epic_manual',
+      entityType: 'User',
+      entityId: userId,
+      metadata: { epicAccountId, epicNick },
+    },
+    db,
+  )
+  return usuario
 }
 
 export interface DatosDiscord {
@@ -102,7 +247,12 @@ export interface DatosEpic {
  * Vincula Epic vía OAuth. Una cuenta Epic = una cuenta Clutch (§2.1).
  * Nunca se guardan usuario/contraseña de Epic, solo el token cifrado.
  */
-export async function vincularEpic(userId: string, datos: DatosEpic, db: Db = prisma) {
+export async function vincularEpic(
+  userId: string,
+  datos: DatosEpic,
+  db: Db = prisma,
+  metodo: 'OAUTH' | 'API' | 'ADMIN' = 'OAUTH',
+) {
   const ocupada = await db.user.findUnique({ where: { epicAccountId: datos.epicAccountId } })
   if (ocupada && ocupada.id !== userId) {
     throw new ErrorClutch('CONFLICTO', 'Esa cuenta de Epic ya está vinculada a otro perfil de Clutch.')
@@ -118,10 +268,27 @@ export async function vincularEpic(userId: string, datos: DatosEpic, db: Db = pr
     data: {
       epicAccountId: datos.epicAccountId,
       epicNick: datos.epicNick,
+      epicLinkMethod: metodo,
       status: 'VERIFIED',
     },
   })
 
+  if (metodo === 'OAUTH') await guardarTokensEpic(userId, datos, db)
+  await fusionarPerfilFantasma(datos.epicNick, datos.epicAccountId, userId, db)
+  await registrar(
+    {
+      actorId: userId,
+      action: 'usuario.vincular_epic',
+      entityType: 'User',
+      entityId: userId,
+      metadata: { epicAccountId: datos.epicAccountId, metodo },
+    },
+    db,
+  )
+  return usuario
+}
+
+async function guardarTokensEpic(userId: string, datos: DatosEpic, db: Db): Promise<void> {
   await db.oAuthAccount.upsert({
     where: { provider_providerAccountId: { provider: 'epic', providerAccountId: datos.epicAccountId } },
     create: {
@@ -139,19 +306,6 @@ export async function vincularEpic(userId: string, datos: DatosEpic, db: Db = pr
       expiresAt: datos.expiresAt ?? undefined,
     },
   })
-
-  await fusionarPerfilFantasma(datos.epicNick, datos.epicAccountId, userId, db)
-  await registrar(
-    {
-      actorId: userId,
-      action: 'usuario.vincular_epic',
-      entityType: 'User',
-      entityId: userId,
-      metadata: { epicAccountId: datos.epicAccountId },
-    },
-    db,
-  )
-  return usuario
 }
 
 /** Reclamo de perfil fantasma (§2.11, caso 2). */

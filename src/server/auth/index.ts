@@ -1,30 +1,59 @@
 import NextAuth from 'next-auth'
+import Credentials from 'next-auth/providers/credentials'
 import Discord from 'next-auth/providers/discord'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { upsertDesdeDiscord, vincularEpic } from '../services/user'
-import { epicProvider } from './epic'
+import { autenticarConEmail, upsertDesdeDiscord } from '../services/user'
+
+const credenciales = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
 
 /**
- * Auth.js v5. Sesión JWT para que /api/v1 pueda servir a la app móvil
+ * Auth.js v5 con sesión JWT, para que /api/v1 pueda servir a la app móvil
  * futura con el mismo token (§1).
+ *
+ * El login es correo y contraseña. Discord queda como vínculo opcional para
+ * los avisos del bot, no como puerta de entrada. Epic Account Services está
+ * fuera por ahora: la verificación de la cuenta de Fortnite se hace por
+ * lookup de nick contra fortnite-api.com (ver vincularEpicPorNick).
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   trustHost: true,
   providers: [
-    Discord({
-      clientId: process.env.DISCORD_CLIENT_ID,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET,
-      authorization: { params: { scope: 'identify email' } },
+    Credentials({
+      name: 'Correo y contraseña',
+      credentials: {
+        email: { label: 'Correo', type: 'email' },
+        password: { label: 'Contraseña', type: 'password' },
+      },
+      async authorize(datos) {
+        const parsed = credenciales.safeParse(datos)
+        if (!parsed.success) return null
+
+        const usuario = await autenticarConEmail(parsed.data.email, parsed.data.password)
+        if (!usuario) return null
+        return { id: usuario.id, name: usuario.displayName, email: usuario.email }
+      },
     }),
-    epicProvider(),
+    ...(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET
+      ? [
+          Discord({
+            clientId: process.env.DISCORD_CLIENT_ID,
+            clientSecret: process.env.DISCORD_CLIENT_SECRET,
+            authorization: { params: { scope: 'identify email' } },
+          }),
+        ]
+      : []),
   ],
   pages: { signIn: '/entrar', error: '/entrar' },
   callbacks: {
     async signIn({ account, profile, user }) {
-      if (!account) return false
+      if (account?.provider === 'credentials') return true
 
-      if (account.provider === 'discord') {
+      if (account?.provider === 'discord') {
         const perfil = profile as { id?: string; username?: string; global_name?: string; avatar?: string } | undefined
         const discordId = perfil?.id ?? account.providerAccountId
         const cuenta = await upsertDesdeDiscord({
@@ -39,47 +68,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
         return cuenta.status !== 'BANNED'
       }
-
-      if (account.provider === 'epic') {
-        // La vinculación de Epic exige una sesión de Discord abierta.
-        return true
-      }
       return false
     },
 
-    async jwt({ token, account, profile }) {
+    async jwt({ token, account, profile, user }) {
+      if (account?.provider === 'credentials' && user?.id) {
+        token.uid = user.id
+      }
+
       if (account?.provider === 'discord') {
         const perfil = profile as { id?: string } | undefined
         const discordId = perfil?.id ?? account.providerAccountId
-        const usuario = await prisma.user.findUnique({ where: { discordId } })
-        if (usuario) {
-          token.uid = usuario.id
-          token.slug = usuario.slug
-          token.estado = usuario.status
-          token.admin = usuario.isAdmin
-        }
+        const cuenta = await prisma.user.findUnique({ where: { discordId } })
+        if (cuenta) token.uid = cuenta.id
       }
 
-      if (account?.provider === 'epic' && typeof token.uid === 'string') {
-        const perfil = profile as { sub?: string; display_name?: string } | undefined
-        if (perfil?.sub) {
-          const usuario = await vincularEpic(token.uid, {
-            epicAccountId: perfil.sub,
-            epicNick: perfil.display_name ?? perfil.sub,
-            accessToken: account.access_token,
-            refreshToken: account.refresh_token,
-            expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : undefined,
-          })
-          token.estado = usuario.status
-        }
-      }
-
-      if (typeof token.uid === 'string' && !account) {
-        const usuario = await prisma.user.findUnique({ where: { id: token.uid } })
-        if (usuario) {
-          token.estado = usuario.status
-          token.admin = usuario.isAdmin
-          token.slug = usuario.slug
+      // Estado, slug y permisos se releen en cada request: un baneo o una
+      // verificación de Epic tienen que surtir efecto sin cerrar sesión.
+      if (typeof token.uid === 'string') {
+        const cuenta = await prisma.user.findUnique({ where: { id: token.uid } })
+        if (cuenta) {
+          token.slug = cuenta.slug
+          token.estado = cuenta.status
+          token.admin = cuenta.isAdmin
+          token.nombre = cuenta.displayName
         }
       }
       return token
@@ -91,6 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.slug = typeof token.slug === 'string' ? token.slug : ''
         session.user.estado = typeof token.estado === 'string' ? token.estado : 'PENDING'
         session.user.admin = token.admin === true
+        if (typeof token.nombre === 'string') session.user.name = token.nombre
       }
       return session
     },

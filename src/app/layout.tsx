@@ -61,8 +61,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="ml-auto flex items-center gap-4">
               <Buscador />
               {sesion?.user ? (
-                <Link href={`/j/${sesion.user.slug}`} className="text-[13px] font-medium">
-                  {sesion.user.name ?? 'Mi perfil'}
+                <Link
+                  href={sesion.user.estado === 'PENDING' ? '/cuenta' : `/j/${sesion.user.slug}`}
+                  className="text-[13px] font-medium"
+                >
+                  {sesion.user.estado === 'PENDING' ? 'Verifica tu nick' : (sesion.user.name ?? 'Mi perfil')}
                 </Link>
               ) : (
                 <Link href="/entrar" className="boton text-[13px]">

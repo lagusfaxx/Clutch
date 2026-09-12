@@ -8,7 +8,7 @@ import { verificarResultado } from '@/server/services/result'
 import { resolverDisputa } from '@/server/services/dispute'
 import { asignarPremios, cargarCodigos, marcarEnviado } from '@/server/services/prize'
 import { cerrarTemporada } from '@/server/services/ranking'
-import { banear } from '@/server/services/user'
+import { banear, vincularEpicManual } from '@/server/services/user'
 import { usuarioActual } from '@/server/auth'
 import { encolar } from '@/server/jobs/boss'
 import { TRABAJOS } from '@/server/jobs/nombres'
@@ -148,6 +148,23 @@ export async function accionCerrarTemporada(seasonId: string): Promise<Respuesta
   return comoAdmin(async (adminId) => {
     const jugadores = await cerrarTemporada(seasonId, adminId)
     return `Temporada cerrada. ${jugadores} jugador(es) archivado(s).`
+  })
+}
+
+/**
+ * Verificación manual del nick, para cuando la API no responde o el jugador
+ * tiene un nick que el lookup no resuelve. El accountId se saca a mano desde
+ * el dashboard de fortnite-api.com.
+ */
+export async function accionVincularEpicManual(formulario: FormData): Promise<Respuesta> {
+  return comoAdmin(async (adminId) => {
+    await vincularEpicManual(
+      String(formulario.get('userId') ?? ''),
+      String(formulario.get('epicAccountId') ?? '').trim(),
+      String(formulario.get('epicNick') ?? '').trim(),
+      adminId,
+    )
+    return 'Cuenta verificada a mano.'
   })
 }
 

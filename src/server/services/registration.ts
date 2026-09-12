@@ -33,7 +33,10 @@ export async function inscribir(
   if (!usuario || usuario.deletedAt) throw new ErrorClutch('NO_ENCONTRADO', 'Esa cuenta no existe.')
   if (usuario.status === 'BANNED') throw new ErrorClutch('PROHIBIDO', 'Tu cuenta está suspendida.')
   if (!usuario.epicAccountId) {
-    throw new ErrorClutch('PROHIBIDO', 'Vincula tu cuenta de Epic antes de inscribirte. Toma menos de un minuto.')
+    throw new ErrorClutch(
+      'PROHIBIDO',
+      'Confirma tu nick de Epic antes de inscribirte. Lo haces en Mi cuenta y toma menos de un minuto.',
+    )
   }
   if (!ESTADOS_ABIERTOS.includes(torneo.status as (typeof ESTADOS_ABIERTOS)[number])) {
     throw new ErrorClutch('CONFLICTO', 'Las inscripciones de este torneo no están abiertas.')
