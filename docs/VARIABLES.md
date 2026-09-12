@@ -272,6 +272,18 @@ aplica solo al arrancar, y si fallan no levanta, que es lo correcto.
 
 ### El dominio responde 404
 
+Antes que nada, en el servidor:
+
+```bash
+bash scripts/diagnostico-coolify.sh tu-dominio.sslip.io
+```
+
+Revisa en orden los cuatro puntos donde se corta la cadena: si el contenedor
+corre, si la aplicación responde por dentro, si tiene etiquetas de Traefik y
+si está en la red del proxy. Dice cuál falla en vez de dejarte adivinar.
+
+#### Lo de siempre
+
 Un 404 al entrar al dominio **no viene de la aplicación**: viene de Traefik,
 que no tiene ninguna ruta para ese nombre. Los logs del contenedor se ven
 perfectos justamente porque la petición nunca le llegó.
