@@ -58,16 +58,11 @@ COPY --from=cli /cli/node_modules ./cli/node_modules
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
 USER nextjs
 # En qué interfaz escucha el servidor. Va explícito porque Docker define
-# HOSTNAME con el ID del contenedor, y el servidor standalone de Next toma
-# esa variable como la dirección donde escuchar: sin esto queda atendiendo
-# solo en la IP de una red, no en todas.
-#
-# Se nota en el banner de arranque, que en vez de 0.0.0.0 muestra algo como
-# http://dc387b08d612:3000. Las consecuencias son dos y ninguna se parece a
-# su causa: el healthcheck pregunta por 127.0.0.1 y no encuentra a nadie, y
-# el contenedor queda unhealthy; y Traefik descarta los contenedores que no
-# están sanos sin anotar nada en su registro, así que el dominio responde
-# 404 con las etiquetas de enrutamiento intactas y el servidor corriendo.
+# HOSTNAME con el ID del contenedor y el servidor standalone de Next lo toma
+# como la dirección donde escuchar: sin esto atiende en una sola IP, falla el
+# healthcheck contra 127.0.0.1, el contenedor queda unhealthy y Traefik lo
+# descarta, de modo que el dominio responde 404 con todo lo demás en orden.
+# El rastro completo está en docs/VARIABLES.md.
 ENV HOSTNAME=0.0.0.0 PORT=3000
 EXPOSE 3000
 CMD ["./docker-entrypoint.sh"]

@@ -609,6 +609,9 @@ model GhostProfile {
   lastSyncedAt    DateTime?
   cachedStats     Json?
   notFound        Boolean   @default(false)
+  /// Por qué no hay stats: privadas, sin-partidas, no-existe o no-disponible.
+  /// Nulo cuando sí las hay. `notFound` sigue marcando si la página se sirve.
+  motivo          String?
   claimedByUserId String?   @unique
   createdAt       DateTime  @default(now())
 

@@ -11,7 +11,10 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://cdn.discordapp.com",
+      // Los iconos de la tienda, las portadas de las novedades y el mapa los
+      // sirven los CDN de fortnite-api.com y de Epic. Sin estos orígenes el
+      // navegador los bloquea y las secciones quedan con los huecos vacíos.
+      "img-src 'self' data: blob: https://cdn.discordapp.com https://fortnite-api.com https://cdn.fortnite-api.com https://cdn2.unrealengine.com https://cdn-live.prm.ol.epicgames.com",
       "connect-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
@@ -29,12 +32,7 @@ const securityHeaders = [
  * request" y el usuario solo ve un error genérico. Declarar acá el dominio
  * evita depender de cómo esté configurado el proxy.
  */
-// El respaldo se resuelve acá y no en el compose: con ARG vacío la variable
-// llega definida pero en blanco, así que `??` no alcanza y hace falta
-// descartar la cadena vacía explícitamente.
-const origenBruto = [process.env.ALLOWED_ORIGINS, process.env.SITE_URL].find((v) => v && v.trim()) ?? ''
-
-const origenesPermitidos = origenBruto
+const origenesPermitidos = (process.env.SITE_URL ?? '')
   .split(',')
   .map((o) => o.trim().replace(/^https?:\/\//, '').replace(/\/$/, ''))
   .filter(Boolean)
