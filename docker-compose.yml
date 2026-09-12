@@ -54,15 +54,11 @@ services:
         condition: service_healthy
     environment:
       # Esta primera clave no es una variable más: es la señal que Coolify
-      # busca para saber que este servicio se publica en el puerto 3000, y
-      # con eso genera las etiquetas de Traefik. Va SIN valor a propósito.
-      # Escribirla como `CLAVE: algo` la convierte en una variable corriente
-      # y el proxy se queda sin ruta, que es el 404 de "page not found".
-      #
-      # Y va en un bloque de mapa, no de lista: Coolify vuelve a escribir
-      # este archivo antes de construir, y una entrada suelta de lista (sin
-      # `=`) la reescribe con la posición como clave, lo que revienta el
-      # despliegue con "non-string key in services.app.environment: 0".
+      # busca para publicar este servicio en el puerto 3000 y generar las
+      # etiquetas de Traefik. Va sin valor y en bloque de mapa, y las dos
+      # cosas importan: con un valor la registra como variable corriente, y
+      # en bloque de lista una entrada sin `=` no sobrevive a la reescritura
+      # que el panel hace del archivo antes de construir.
       SERVICE_FQDN_APP_3000:
       DATABASE_URL: postgresql://${POSTGRES_USER:-clutch}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-clutch}
       AUTH_SECRET: ${AUTH_SECRET:?define AUTH_SECRET en el .env}

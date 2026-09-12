@@ -272,34 +272,23 @@ aplica solo al arrancar, y si fallan no levanta, que es lo correcto.
 
 ### El dominio responde 404
 
-Antes que nada, en el servidor:
+Un 404 al entrar al dominio **no viene de la aplicación**: lo responde Traefik
+cuando no encuentra ninguna ruta para ese nombre. Los logs del contenedor se
+ven perfectos justamente porque la petición nunca le llegó.
+
+Lo primero es mirar el estado del contenedor, no el proxy:
 
 ```bash
-bash scripts/diagnostico-coolify.sh tu-dominio.sslip.io
+docker ps --filter name=app- --format '{{.Names}}\t{{.Status}}'
 ```
 
-Revisa en orden los cuatro puntos donde se corta la cadena: si el contenedor
-corre, si la aplicación responde por dentro, si tiene etiquetas de Traefik y
-si está en la red del proxy. Dice cuál falla en vez de dejarte adivinar.
+Si dice `unhealthy`, ahí está el 404. **Traefik descarta los contenedores que
+no están sanos** antes de mirar sus etiquetas, y no deja constancia de
+haberlo hecho. El resultado es idéntico a un dominio mal configurado: reglas
+de enrutamiento correctas, aplicación corriendo y contestando por dentro, y
+un 404 sin una sola línea de error en ninguna parte.
 
-#### Lo de siempre
-
-Un 404 al entrar al dominio **no viene de la aplicación**: viene de Traefik,
-que no tiene ninguna ruta para ese nombre. Los logs del contenedor se ven
-perfectos justamente porque la petición nunca le llegó.
-
-Revisa, en este orden:
-
-1. Que el dominio esté asignado al servicio **app**, no al servicio `db` ni
-   al recurso completo.
-2. Que el puerto sea **3000**. En Coolify el campo del dominio acepta el
-   puerto: `http://tu-dominio.sslip.io:3000`.
-3. Que el despliegue haya terminado bien y el contenedor esté corriendo.
-
-El compose declara `SERVICE_FQDN_APP_3000` justamente para que Coolify sepa
-a qué puerto enrutar y genere las etiquetas de Traefik solo.
-
-Ojo con el detalle del banner de arranque: Next imprime
+De ahí que el banner de arranque de Next merezca una mirada:
 
 ```
 - Local:   http://9959687655b2:3000
@@ -312,16 +301,27 @@ proxy.
 Lo que NO es normal es que aparezca ahí y no `0.0.0.0`. Esa línea dice en qué
 interfaz quedó escuchando, y el servidor standalone lo decide leyendo la
 variable `HOSTNAME`, que Docker define con el identificador del contenedor. Si
-nadie la fija, Next atiende solo en la IP de una red.
+nadie la fija, Next atiende en una sola IP, el healthcheck pregunta por
+`127.0.0.1`, no encuentra a nadie, y el contenedor queda `unhealthy`. El
+Dockerfile fija `HOSTNAME=0.0.0.0` en la etapa final para que no pase.
 
-Y desde ahí el fallo no se parece en nada a su causa: el healthcheck pregunta
-por `127.0.0.1`, no encuentra a nadie y el contenedor queda `unhealthy`;
-Traefik descarta los contenedores que no están sanos y no anota nada al
-hacerlo; el dominio responde 404 con las etiquetas de enrutamiento correctas y
-la aplicación corriendo y contestando por dentro. Un 404 con el contenedor
-`unhealthy` se mira por acá antes que por el proxy.
+Si el contenedor está sano y el 404 sigue, entonces sí es el enrutamiento:
 
-El Dockerfile fija `HOSTNAME=0.0.0.0` en la etapa final para que esto no pase.
+```bash
+docker inspect -f '{{json .Config.Labels}}' $(docker ps -q --filter name=app-) \
+  | tr ',' '\n' | grep -i traefik
+```
+
+La regla `Host(...)` que salga ahí tiene que ser, letra por letra, el dominio
+que escribes en el navegador. Si no hay ninguna etiqueta, Coolify no generó la
+ruta: revisa que el dominio esté asignado al servicio **app** y no al `db`.
+
+El compose declara `SERVICE_FQDN_APP_3000` para que Coolify sepa a qué puerto
+enrutar y genere esas etiquetas solo.
+
+No hace falta que el contenedor esté en la red `coolify`: el proxy se conecta
+a la red de cada proyecto, así que verlo solo en la red del proyecto es lo
+esperado y no es la causa de un 404.
 
 ### El despliegue falla con "Invalid template"
 
