@@ -1,0 +1,701 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum Game {
+  FORTNITE
+  CS2
+}
+
+enum GameMode {
+  SOLO
+  DUO
+  SQUAD
+}
+
+enum UserStatus {
+  PENDING
+  VERIFIED
+  TRUSTED
+  FLAGGED
+  BANNED
+}
+
+enum TournamentFormat {
+  PUNTOS
+  ELIMINACION_SIMPLE
+  ELIMINACION_DOBLE
+  LIGA
+}
+
+enum TournamentStatus {
+  DRAFT
+  PUBLICADO
+  INSCRIPCION_ABIERTA
+  CHECK_IN
+  EN_CURSO
+  EN_DISPUTA
+  CERRADO
+  CANCELADO
+}
+
+enum PlatformRule {
+  CUALQUIERA
+  SOLO_PC
+  SOLO_CONSOLA
+  SOLO_MOBILE
+}
+
+enum RegistrationStatus {
+  PENDIENTE_PAGO
+  CONFIRMADA
+  EN_ESPERA
+  CHECKED_IN
+  NO_SHOW
+  RETIRADA
+}
+
+enum ResultStatus {
+  REPORTADO
+  VERIFICADO
+  EN_DISPUTA
+  RECHAZADO
+}
+
+enum SnapshotPhase {
+  PRE
+  POST
+}
+
+enum PrizeType {
+  VBUCKS
+  HARDWARE
+}
+
+enum CodeStatus {
+  DISPONIBLE
+  ASIGNADO
+  ENTREGADO
+  INVALIDO
+}
+
+enum ClaimStatus {
+  PENDIENTE_DATOS
+  PENDIENTE_ENVIO
+  ENVIADO
+  RECIBIDO
+  REVELADO
+  CANCELADO
+}
+
+enum PaymentStatus {
+  INICIADO
+  AUTORIZADO
+  RECHAZADO
+  ANULADO
+  REEMBOLSADO
+}
+
+enum DisputeStatus {
+  ABIERTA
+  EN_REVISION
+  RESUELTA
+  DESESTIMADA
+}
+
+// ----------------------------------------------------------------------------
+// Cuentas
+// ----------------------------------------------------------------------------
+
+model User {
+  id            String     @id @default(cuid())
+  discordId     String     @unique
+  discordTag    String?
+  epicAccountId String?    @unique
+  epicNick      String?
+  displayName   String
+  slug          String     @unique
+  email         String?    @unique
+  rut           String?    @unique
+  birthDate     DateTime?
+  guardianEmail String?
+  region        String?
+  avatarUrl     String?
+  status        UserStatus @default(PENDING)
+  strikes       Int        @default(0)
+  isAdmin       Boolean    @default(false)
+  statsPrivate  Boolean    @default(false)
+  showPresence  Boolean    @default(false)
+  dmsOpen       Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  registrations   Registration[]
+  ratings         Rating[]
+  prizeClaims     PrizeClaim[]
+  teamMembers     TeamMember[]
+  snapshots       FortniteStatsSnapshot[]
+  strikeEvents    Strike[]
+  conversations   ConversationMember[]
+  messages        Message[]
+  blocksMade      Block[]                @relation("bloqueador")
+  blocksReceived  Block[]                @relation("bloqueado")
+  oauthAccounts   OAuthAccount[]
+  disputesOpened  Dispute[]              @relation("impugnador")
+  disputesClosed  Dispute[]              @relation("resolutor")
+  payments        Payment[]
+  reportsMade     Report[]               @relation("reportante")
+  reportsReceived Report[]               @relation("reportado")
+  searchHistory   SearchQuery[]
+
+  @@index([status])
+  @@index([region])
+}
+
+/// Tokens OAuth (Epic Account Services, Discord). Cifrados en reposo.
+model OAuthAccount {
+  id                 String    @id @default(cuid())
+  userId             String
+  provider           String
+  providerAccountId  String
+  encryptedAccess    String?
+  encryptedRefresh   String?
+  expiresAt          DateTime?
+  scope              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Ban {
+  id            String    @id @default(cuid())
+  userId        String?
+  epicAccountId String?
+  discordId     String?
+  ipHash        String?
+  reason        String
+  until         DateTime?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+
+  @@index([epicAccountId])
+  @@index([discordId])
+  @@index([ipHash])
+}
+
+model Strike {
+  id           String   @id @default(cuid())
+  userId       String
+  reason       String
+  tournamentId String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Torneos
+// ----------------------------------------------------------------------------
+
+model Season {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  game      Game
+  startsAt  DateTime
+  endsAt    DateTime
+  closedAt  DateTime?
+  createdAt DateTime @default(now())
+
+  ratings     Rating[]
+  tournaments Tournament[]
+  archives    RatingArchive[]
+
+  @@index([game, startsAt])
+}
+
+model Tournament {
+  id             String           @id @default(cuid())
+  slug           String           @unique
+  name           String
+  description    String?
+  game           Game             @default(FORTNITE)
+  format         TournamentFormat @default(PUNTOS)
+  mode           GameMode
+  status         TournamentStatus @default(DRAFT)
+  platformRule   PlatformRule     @default(CUALQUIERA)
+  serverRegion   String           @default("BR")
+  region         String?
+  seasonId       String?
+  startsAt       DateTime
+  endsAt         DateTime
+  checkInOpensAt DateTime
+  maxSlots       Int
+  minSlots       Int              @default(0)
+  entryFeeClp    Int              @default(0)
+  scoringConfig  Json
+  matchesCounted Int              @default(6)
+  matchesTotal   Int              @default(8)
+  minRating      Int?
+  minTournaments Int              @default(0)
+  rulesUrl       String?
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
+
+  season        Season?        @relation(fields: [seasonId], references: [id])
+  registrations Registration[]
+  matches       Match[]
+  prizes        Prize[]
+  disputes      Dispute[]
+  payments      Payment[]
+  snapshots     FortniteStatsSnapshot[]
+
+  @@index([status, startsAt])
+  @@index([game, mode])
+}
+
+model Team {
+  id        String    @id @default(cuid())
+  name      String
+  tag       String    @unique
+  slug      String    @unique
+  logoUrl   String?
+  captainId String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  members       TeamMember[]
+  registrations Registration[]
+}
+
+model TeamMember {
+  id       String    @id @default(cuid())
+  teamId   String
+  userId   String
+  role     String    @default("MIEMBRO")
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+model Registration {
+  id           String             @id @default(cuid())
+  tournamentId String
+  userId       String
+  teamId       String?
+  status       RegistrationStatus @default(CONFIRMADA)
+  checkedInAt  DateTime?
+  paymentId    String?            @unique
+  seed         Int?
+  waitlistPos  Int?
+  rosterLock   Json?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  tournament Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team       Team?         @relation(fields: [teamId], references: [id])
+  results    MatchResult[]
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, status])
+}
+
+model Match {
+  id           String    @id @default(cuid())
+  tournamentId String
+  index        Int
+  startsAt     DateTime?
+  closesAt     DateTime?
+  lobbyCode    String?
+  bracketRound Int?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  tournament Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  results    MatchResult[]
+
+  @@unique([tournamentId, index])
+}
+
+model MatchResult {
+  id              String       @id @default(cuid())
+  matchId         String
+  registrationId  String
+  placement       Int
+  eliminations    Int
+  points          Int          @default(0)
+  evidenceUrl     String?
+  status          ResultStatus @default(REPORTADO)
+  confidenceScore Float?
+  reportedAt      DateTime     @default(now())
+  verifiedById    String?
+  verifiedAt      DateTime?
+  notes           String?
+  deletedAt       DateTime?
+
+  match        Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  disputes     Dispute[]
+
+  @@unique([matchId, registrationId])
+  @@index([status])
+}
+
+model Dispute {
+  id            String        @id @default(cuid())
+  tournamentId  String
+  matchResultId String?
+  openedById    String
+  reason        String
+  evidenceUrl   String?
+  status        DisputeStatus @default(ABIERTA)
+  resolvedById  String?
+  resolution    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+
+  tournament  Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matchResult MatchResult? @relation(fields: [matchResultId], references: [id])
+  openedBy    User         @relation("impugnador", fields: [openedById], references: [id])
+  resolvedBy  User?        @relation("resolutor", fields: [resolvedById], references: [id])
+
+  @@index([tournamentId, status])
+}
+
+// ----------------------------------------------------------------------------
+// Ranking
+// ----------------------------------------------------------------------------
+
+model Rating {
+  id           String    @id @default(cuid())
+  userId       String
+  game         Game
+  mode         GameMode
+  seasonId     String
+  rating       Float     @default(1500)
+  deviation    Float     @default(350)
+  volatility   Float     @default(0.06)
+  peakRating   Float     @default(1500)
+  matchCount   Int       @default(0)
+  lastPlayedAt DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, game, mode, seasonId])
+  @@index([game, mode, seasonId, rating])
+}
+
+model RatingArchive {
+  id         String   @id @default(cuid())
+  userId     String
+  seasonId   String
+  game       Game
+  mode       GameMode
+  rating     Float
+  deviation  Float
+  position   Int?
+  matchCount Int
+  archivedAt DateTime @default(now())
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seasonId, game, mode])
+}
+
+model RatingHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  game         Game
+  mode         GameMode
+  seasonId     String
+  tournamentId String?
+  ratingBefore Float
+  ratingAfter  Float
+  reason       String
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Premios y pagos
+// ----------------------------------------------------------------------------
+
+model Prize {
+  id           String    @id @default(cuid())
+  tournamentId String
+  placement    Int
+  type         PrizeType
+  faceValue    Int       @default(0)
+  description  String
+  hardwareSku  String?
+  createdAt    DateTime  @default(now())
+
+  tournament Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  claims     PrizeClaim[]
+
+  @@unique([tournamentId, placement])
+}
+
+model PrizeCode {
+  id            String     @id @default(cuid())
+  type          PrizeType
+  faceValue     Int
+  encryptedCode String?
+  batchRef      String?
+  status        CodeStatus @default(DISPONIBLE)
+  claimId       String?    @unique
+  revealedAt    DateTime?
+  createdAt     DateTime   @default(now())
+
+  claim PrizeClaim? @relation(fields: [claimId], references: [id])
+
+  @@index([status, type])
+}
+
+model HardwareItem {
+  id        String   @id @default(cuid())
+  sku       String   @unique
+  name      String
+  stock     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model PrizeClaim {
+  id           String      @id @default(cuid())
+  prizeId      String
+  userId       String
+  status       ClaimStatus @default(PENDIENTE_DATOS)
+  rut          String?
+  shipName     String?
+  shipAddress  String?
+  shipComuna   String?
+  shipRegion   String?
+  shipPhone    String?
+  trackingCode String?
+  revealedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  prize Prize      @relation(fields: [prizeId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code  PrizeCode?
+
+  @@unique([prizeId, userId])
+  @@index([userId, status])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  userId         String
+  tournamentId   String
+  amountClp      Int
+  status         PaymentStatus @default(INICIADO)
+  buyOrder       String        @unique
+  sessionId      String
+  token          String?       @unique
+  authorizationCode String?
+  responseCode   Int?
+  rawPayload     Json?
+  refundedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+/// Idempotencia de webhooks externos (Transbank reintenta).
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  provider    String
+  externalId  String
+  payload     Json
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([provider, externalId])
+}
+
+// ----------------------------------------------------------------------------
+// Fortnite / proveedores externos
+// ----------------------------------------------------------------------------
+
+model FortniteStatsSnapshot {
+  id            String        @id @default(cuid())
+  userId        String
+  tournamentId  String?
+  phase         SnapshotPhase
+  provider      String
+  rawPayload    Json
+  wins          Int?
+  kills         Int?
+  matchesPlayed Int?
+  capturedAt    DateTime      @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tournament Tournament? @relation(fields: [tournamentId], references: [id])
+
+  @@index([userId, tournamentId, phase])
+}
+
+model ProviderHealth {
+  id             String    @id @default(cuid())
+  provider       String    @unique
+  consecutiveFails Int     @default(0)
+  openedUntil    DateTime?
+  lastError      String?
+  updatedAt      DateTime  @updatedAt
+}
+
+model Cache {
+  key       String   @id
+  value     Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model GhostProfile {
+  id              String    @id @default(cuid())
+  epicNick        String    @unique
+  epicAccountId   String?   @unique
+  slug            String    @unique
+  lastSyncedAt    DateTime?
+  cachedStats     Json?
+  notFound        Boolean   @default(false)
+  claimedByUserId String?   @unique
+  createdAt       DateTime  @default(now())
+
+  @@index([epicNick])
+}
+
+model SearchQuery {
+  id        String   @id @default(cuid())
+  userId    String
+  term      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Mensajería y moderación
+// ----------------------------------------------------------------------------
+
+model Conversation {
+  id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
+  lastMessageAt DateTime?
+  archivedAt    DateTime?
+
+  participants ConversationMember[]
+  messages     Message[]
+}
+
+model ConversationMember {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime?
+  leftAt         DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("bloqueador", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("bloqueado", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  reportedId String
+  context    String
+  contextId  String?
+  reason     String
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  reporter User @relation("reportante", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("reportado", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@index([resolvedAt])
+}
+
+// ----------------------------------------------------------------------------
+// Auditoría
+// ----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json
+  ip         String?
+  publico    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
