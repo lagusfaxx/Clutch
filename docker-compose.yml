@@ -1,11 +1,14 @@
-# Despliegue en un VPS con Docker, sin panel de por medio.
+# Despliegue con Docker. Las migraciones corren solas al levantar la
+# aplicación.
 #
-#   cp .env.example .env    # completa AUTH_SECRET, FORTNITE_API_KEY y las demás
-#   docker compose up -d --build
+# Con Coolify (buildpack Docker Compose), usa este archivo tal cual: el
+# contenedor NO publica puertos y Traefik lo alcanza por la red interna.
+# Define el dominio del servicio `app` en el panel de Coolify.
 #
-# Las migraciones corren solas al levantar la aplicación. Para Coolify no
-# hace falta este archivo: ahí se usa el Dockerfile y un PostgreSQL
-# gestionado por el panel, que además te da los respaldos programados.
+# En un VPS pelado, sin panel ni proxy, hace falta publicar el puerto:
+#
+#   cp .env.example .env    # completa AUTH_SECRET, POSTGRES_PASSWORD, etc.
+#   docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
 
 services:
   db:
@@ -17,9 +20,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-clutch}
     volumes:
       - datos_postgres:/var/lib/postgresql/data
-      # Los respaldos caen acá. Súbelos a otra parte: un respaldo en el mismo
-      # servidor que la base no es un respaldo.
-      - ./respaldos:/respaldos
+      # Los respaldos de pg_dump caen acá. Va como volumen con nombre y no
+      # como carpeta del proyecto porque el panel puede rehacer el directorio
+      # de despliegue en cada redeploy y se llevaría los respaldos.
+      # Súbelos a otra parte igual: un respaldo en el mismo servidor que la
+      # base no es un respaldo.
+      - respaldos:/respaldos
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-clutch} -d ${POSTGRES_DB:-clutch}']
       interval: 10s
@@ -53,8 +59,14 @@ services:
       # Una sola instancia corre la cola y el bot. Si algún día escalas a
       # varias, esto va en true en una sola.
       RUN_BACKGROUND: 'true'
-    ports:
-      - '${PUERTO:-3000}:3000'
+    # Sin `ports` a propósito.
+    #
+    # Detrás de un proxy (Traefik en Coolify, o nginx propio), publicar el
+    # puerto en el host no aporta nada y además choca: si algo más ya ocupa
+    # el 3000, el despliegue muere con "port is already allocated".
+    # Para un VPS sin proxy, docker-compose.vps.yml agrega la publicación.
+    expose:
+      - '3000'
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -64,3 +76,4 @@ services:
 
 volumes:
   datos_postgres:
+  respaldos:

@@ -49,12 +49,19 @@ La forma más corta de tenerlo andando en un VPS:
 
 ```bash
 cp .env.example .env    # completa AUTH_SECRET, POSTGRES_PASSWORD, FORTNITE_API_KEY
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
 ```
 
 Levanta la aplicación y PostgreSQL, aplica las migraciones sola y deja el
 sitio en el puerto 3000. La base no publica puertos: solo se ve desde la red
 interna de compose.
+
+El segundo archivo es el que publica el puerto en el host, y existe aparte
+porque **detrás de un proxy no se usa**. Con Coolify basta
+`docker-compose.yml`: Traefik alcanza el contenedor por la red interna, y
+publicar el puerto solo consigue chocar con lo que ya escuche en el host
+(`port is already allocated`). Ver
+[docs/VARIABLES.md](docs/VARIABLES.md) para el paso a paso del panel.
 
 Para generar los secretos de una vez:
 

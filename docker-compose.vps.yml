@@ -1,0 +1,15 @@
+# Publicación de puerto para un VPS sin proxy delante.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+#
+# NO uses este archivo en Coolify ni detrás de nginx o Traefik: ahí el proxy
+# alcanza el contenedor por la red interna de Docker, y publicar el puerto
+# solo consigue chocar con lo que ya esté escuchando en el host.
+#
+# Si el puerto 3000 está ocupado, define PUERTO en el .env (por ejemplo
+# PUERTO=3001) y apunta SITE_URL y AUTH_URL a ese mismo puerto.
+
+services:
+  app:
+    ports:
+      - '${PUERTO:-3000}:3000'

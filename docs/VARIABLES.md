@@ -241,6 +241,48 @@ simplemente no hace nada: no rompe nada más.
 
 ---
 
+## 5.5 Despliegue en Coolify con Docker Compose
+
+Coolify pone Traefik delante y llega al contenedor **por la red interna de
+Docker**. Por eso el servicio `app` no publica puertos: usa `expose`.
+
+Si ves este error en el despliegue:
+
+```
+Bind for 0.0.0.0:3000 failed: port is already allocated
+```
+
+es que el compose está publicando un puerto del host que ya está ocupado.
+Con `expose` eso no puede pasar, porque no se toca ningún puerto del host.
+
+Pasos en el panel:
+
+1. Crea el recurso con el buildpack **Docker Compose**, apuntando al
+   repositorio y a la rama.
+2. Carga las variables de entorno del panel: al menos `POSTGRES_PASSWORD`,
+   `AUTH_SECRET`, `PRIZE_ENCRYPTION_KEY`, `FORTNITE_API_KEY`, `SITE_URL` y
+   `AUTH_URL`.
+3. Asigna el dominio al servicio **app**, en el puerto **3000**. Si todavía
+   no tienes dominio, Coolify puede generarte uno con sslip.io.
+4. `SITE_URL` y `AUTH_URL` tienen que coincidir **exactamente** con ese
+   dominio, protocolo incluido.
+
+Las migraciones no necesitan comando de pre-deploy: el contenedor las
+aplica solo al arrancar, y si fallan no levanta, que es lo correcto.
+
+### En un VPS sin panel ni proxy
+
+Ahí sí hace falta publicar el puerto, y va en un archivo aparte:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+```
+
+Si el 3000 está ocupado, define `PUERTO=3001` en el `.env` y ajusta
+`SITE_URL` y `AUTH_URL` al mismo puerto.
+
+---
+
 ## 6. Transbank (Webpay Plus)
 
 Solo hace falta si vas a cobrar inscripción. Los torneos gratis no lo tocan.
