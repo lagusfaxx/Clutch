@@ -270,6 +270,52 @@ Pasos en el panel:
 Las migraciones no necesitan comando de pre-deploy: el contenedor las
 aplica solo al arrancar, y si fallan no levanta, que es lo correcto.
 
+### El dominio responde 404
+
+Un 404 al entrar al dominio **no viene de la aplicación**: viene de Traefik,
+que no tiene ninguna ruta para ese nombre. Los logs del contenedor se ven
+perfectos justamente porque la petición nunca le llegó.
+
+Revisa, en este orden:
+
+1. Que el dominio esté asignado al servicio **app**, no al servicio `db` ni
+   al recurso completo.
+2. Que el puerto sea **3000**. En Coolify el campo del dominio acepta el
+   puerto: `http://tu-dominio.sslip.io:3000`.
+3. Que el despliegue haya terminado bien y el contenedor esté corriendo.
+
+El compose declara `SERVICE_FQDN_APP_3000` justamente para que Coolify sepa
+a qué puerto enrutar y genere las etiquetas de Traefik solo.
+
+Ojo con el detalle del banner de arranque: Next imprime
+
+```
+- Local:   http://9959687655b2:3000
+```
+
+Ese `9959687655b2` es el identificador del contenedor, no tu dominio. Next
+escucha en `0.0.0.0` y no sabe nada de `SITE_URL`; el dominio lo resuelve el
+proxy. Que ahí no aparezca tu dominio es lo normal, no es el problema.
+
+### Los formularios fallan con un error genérico
+
+Si el sitio carga pero entrar, registrarse o inscribirse tira un error sin
+explicación, y en los logs del contenedor aparece:
+
+```
+`x-forwarded-host` header ... does not match `origin` header ...
+Invalid Server Actions request.
+```
+
+es la protección contra CSRF de Next: compara el origen del navegador contra
+el encabezado que reenvía el proxy, y si no calzan aborta el envío.
+
+El compose lo resuelve pasando el dominio como argumento de construcción
+`ALLOWED_ORIGINS`, que toma el valor de `SITE_URL`. Con una diferencia
+importante: **Next graba esa lista dentro de la imagen**, así que si cambias
+de dominio hay que **reconstruir**, no solo reiniciar. En Coolify, eso es
+volver a desplegar y no simplemente actualizar la variable.
+
 ### En un VPS sin panel ni proxy
 
 Ahí sí hace falta publicar el puerto, y va en un archivo aparte:

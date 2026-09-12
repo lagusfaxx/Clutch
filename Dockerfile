@@ -5,6 +5,12 @@ RUN npm ci
 
 FROM node:22-alpine AS builder
 WORKDIR /app
+# Los orígenes permitidos para Server Actions quedan grabados en el build
+# (Next los serializa en required-server-files.json), así que tienen que
+# llegar como argumento de construcción y no como variable de ejecución.
+# Cambiar de dominio obliga a reconstruir la imagen.
+ARG ALLOWED_ORIGINS=""
+ENV ALLOWED_ORIGINS=$ALLOWED_ORIGINS
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate && npm run build

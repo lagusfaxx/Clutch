@@ -20,9 +20,26 @@ const securityHeaders = [
   },
 ]
 
+/**
+ * Orígenes permitidos para Server Actions.
+ *
+ * Next 15 compara la cabecera `origin` del navegador contra `x-forwarded-host`
+ * para prevenir CSRF. Si el proxy no reenvía ese encabezado con el dominio
+ * público, TODOS los formularios del sitio mueren con "Invalid Server Actions
+ * request" y el usuario solo ve un error genérico. Declarar acá el dominio
+ * evita depender de cómo esté configurado el proxy.
+ */
+const origenesPermitidos = (process.env.ALLOWED_ORIGINS ?? process.env.SITE_URL ?? '')
+  .split(',')
+  .map((o) => o.trim().replace(/^https?:\/\//, '').replace(/\/$/, ''))
+  .filter(Boolean)
+
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  experimental: {
+    serverActions: origenesPermitidos.length > 0 ? { allowedOrigins: origenesPermitidos } : {},
+  },
   serverExternalPackages: ['discord.js', 'pg-boss', '@prisma/client'],
   poweredByHeader: false,
   async headers() {

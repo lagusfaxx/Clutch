@@ -35,7 +35,14 @@ services:
     # Sin puertos publicados: la base solo se ve desde la red interna.
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Dominios desde los que se aceptan envíos de formulario. Si queda
+        # vacío y el proxy no reenvía x-forwarded-host con el dominio
+        # público, Next rechaza cada formulario con "Invalid Server Actions
+        # request" y el usuario solo ve un error genérico.
+        ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-${SITE_URL:-}}
     restart: unless-stopped
     depends_on:
       db:
@@ -59,6 +66,12 @@ services:
       # Una sola instancia corre la cola y el bot. Si algún día escalas a
       # varias, esto va en true en una sola.
       RUN_BACKGROUND: 'true'
+      # Le dice a Coolify a qué puerto enrutar este servicio y le pide que
+      # genere las etiquetas de Traefik. Sin esto, con un compose que no
+      # publica puertos, el proxy puede quedarse sin ruta y el dominio
+      # responde 404. El dominio que definas en el panel manda por sobre
+      # el que se genere acá.
+      SERVICE_FQDN_APP_3000: ${SERVICE_FQDN_APP_3000:-}
     # Sin `ports` a propósito.
     #
     # Detrás de un proxy (Traefik en Coolify, o nginx propio), publicar el
