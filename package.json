@@ -18,7 +18,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "check:ai-smell": "bash scripts/check-ai-smell.sh",
-    "test:humo": "tsx scripts/humo.ts"
+    "test:humo": "tsx scripts/humo.ts",
+    "env:check": "tsx scripts/revisar-env.ts",
+    "secretos": "node -e \"const c=require('node:crypto');console.log('AUTH_SECRET='+c.randomBytes(32).toString('base64'));console.log('PRIZE_ENCRYPTION_KEY='+c.randomBytes(32).toString('base64'));console.log('POSTGRES_PASSWORD='+c.randomBytes(24).toString('hex'))\""
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

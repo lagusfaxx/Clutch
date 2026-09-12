@@ -56,7 +56,14 @@ Levanta la aplicación y PostgreSQL, aplica las migraciones sola y deja el
 sitio en el puerto 3000. La base no publica puertos: solo se ve desde la red
 interna de compose.
 
-Para generar los secretos: `openssl rand -base64 32`.
+Para generar los secretos de una vez:
+
+```bash
+npm run secretos        # imprime AUTH_SECRET, PRIZE_ENCRYPTION_KEY y POSTGRES_PASSWORD
+npm run env:check       # dice qué falta y qué se degrada sin cada variable
+```
+
+**De dónde sale cada variable, paso a paso: [docs/VARIABLES.md](docs/VARIABLES.md).**
 
 Con compose los respaldos son tuyos. `./respaldos` está montado dentro del
 contenedor de la base para que `pg_dump` escriba ahí, pero tienes que
@@ -81,6 +88,7 @@ npm run typecheck        # TypeScript estricto, con noUncheckedIndexedAccess
 npm test                 # lógica pura: Glicko-2, puntaje, RUT, cifrado, CS2
 npm run check:ai-smell   # controles de §7 antes de desplegar
 npm run test:humo        # flujo completo de un torneo contra una base real
+npm run env:check        # revisa la configuración y explica qué se cae sin cada variable
 ```
 
 `test:humo` necesita una base con las migraciones aplicadas y escribe datos
@@ -100,7 +108,9 @@ Health check:  /api/health   (verifica la conexión a Postgres, no solo el proce
 Puerto:        3000
 ```
 
-Variables de entorno: ver `.env.example`. Ninguna vive en el repositorio.
+Variables de entorno: ver [docs/VARIABLES.md](docs/VARIABLES.md) para saber de
+dónde sale cada una, y `.env.example` como plantilla. Ninguna vive en el
+repositorio.
 
 `RUN_BACKGROUND=true` solo puede estar en **una** réplica. Con dos, el bot de
 Discord se conecta dos veces y duplica cada mensaje: pg-boss maneja el
