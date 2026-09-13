@@ -8,6 +8,7 @@ import { historialDeUsuario } from '@/server/services/ranking'
 import { usuarioActual } from '@/server/auth'
 import { fechaCL } from '@/lib/fechas'
 import { Evolucion } from '@/components/Evolucion'
+import { consultarJugador } from '@/server/services/fortnite/client'
 import type { MotivoSinStats } from '@/server/services/fortnite/client'
 import { StatsFortnite, AvisoSinStats } from '@/components/StatsFortnite'
 import { leerStatsGuardadas } from '@/server/services/fortnite/guardadas'
@@ -39,6 +40,11 @@ export default async function PerfilPage({ params }: { params: Promise<{ slug: s
   if (!perfil) return <PerfilFantasma slug={slug} />
 
   const [historial, yo] = await Promise.all([historialDeUsuario(perfil.id), usuarioActual()])
+
+  // Las stats de Fortnite son públicas o no son: si el jugador marcó su
+  // perfil como privado en Clutch, acá no se muestran aunque la API las dé.
+  const fortnite =
+    perfil.epicNick && !perfil.statsPrivate ? await consultarJugador(perfil.epicNick).catch(() => null) : null
 
   const resultados: { torneo: string; slug: string; fecha: Date; posicion: number; puntos: number }[] = []
   for (const reg of perfil.registrations) {
@@ -91,6 +97,11 @@ export default async function PerfilPage({ params }: { params: Promise<{ slug: s
           )}
         </div>
       </header>
+
+      {fortnite?.estado === 'ok' && <StatsFortnite stats={fortnite.stats} />}
+      {fortnite?.estado === 'sin-stats' && perfil.epicNick && (
+        <AvisoSinStats motivo={fortnite.motivo} nick={perfil.epicNick} />
+      )}
 
       <section className="grid gap-px bg-linea lg:grid-cols-[1fr_1fr]">
         <div className="bg-panel p-5">

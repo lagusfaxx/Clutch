@@ -15,10 +15,10 @@ export default async function MapaPage() {
 
   return (
     <div className="space-y-5">
-      <header className="bloque p-5">
-        <h1 className="text-[19px] font-bold">Mapa</h1>
-        <p className="mt-1 text-[13px] text-humo">
-          La isla de la temporada actual. {datos ? `${datos.lugares.length} lugares con nombre.` : ''}
+      <header>
+        <h1 className="text-[28px] font-bold leading-none tracking-tight">Mapa</h1>
+        <p className="mt-1.5 text-[13px] text-humo">
+          La isla de la temporada actual{datos ? ` · ${datos.lugares.length} lugares con nombre` : ''}.
         </p>
       </header>
 
@@ -30,11 +30,13 @@ export default async function MapaPage() {
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={datos.imagen} alt="Mapa de Fortnite" className="bloque w-full" />
           )}
-          <section className="bloque p-5">
+          <section>
             <h2 className="etiqueta mb-2">Lugares con nombre</h2>
-            <ul className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px] sm:grid-cols-3 lg:grid-cols-4">
+            <ul className="grid grid-cols-2 gap-px bg-linea sm:grid-cols-3 lg:grid-cols-4">
               {datos.lugares.map((l) => (
-                <li key={l}>{l}</li>
+                <li key={l} className="bg-panel px-3 py-2 text-[13px]">
+                  {l}
+                </li>
               ))}
             </ul>
           </section>
