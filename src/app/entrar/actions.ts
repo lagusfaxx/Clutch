@@ -4,7 +4,7 @@ import { AuthError } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
-import { signIn } from '@/server/auth'
+import { signIn, signOut } from '@/server/auth'
 import { usuarioActual } from '@/server/auth'
 import { registrarConEmail, vincularEpicPorNick, cambiarClave } from '@/server/services/user'
 import { esErrorClutch } from '@/lib/errores'
@@ -87,4 +87,14 @@ export async function accionCambiarClave(formulario: FormData): Promise<Respuest
     if (esErrorClutch(e)) return { ok: false, mensaje: e.message }
     return { ok: false, mensaje: 'No pudimos cambiar la contraseña.' }
   }
+}
+
+/**
+ * Cerrar sesión. Va como acción de servidor y no como enlace porque borrar
+ * la sesión cambia estado: un GET lo puede disparar cualquier cosa que
+ * precargue enlaces, desde el navegador hasta un antivirus, y el jugador se
+ * encontraría fuera sin haber tocado nada.
+ */
+export async function accionSalir(): Promise<void> {
+  await signOut({ redirectTo: '/' })
 }

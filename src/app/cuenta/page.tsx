@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { usuarioActual } from '@/server/auth'
 import { verificacionDisponible } from '@/server/services/fortnite/client'
 import { FormularioEpic, FormularioClave } from '@/components/FormulariosCuenta'
+import { accionSalir } from '@/app/entrar/actions'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Mi cuenta' }
@@ -67,6 +68,19 @@ export default async function CuentaPage() {
         <Link href={`/j/${usuario.slug}`} className="boton-plano mt-3">
           Ver mi perfil
         </Link>
+      </section>
+
+      <section className="bloque p-5">
+        <h2 className="text-[15px] font-semibold">Sesión</h2>
+        <p className="mt-1 text-[13px] text-humo">
+          Cierra la sesión en este dispositivo. Se cierra acá y en la barra de arriba: en un computador compartido,
+          esto es lo que impide que el siguiente entre con tu cuenta.
+        </p>
+        <form action={accionSalir} className="mt-3">
+          <button type="submit" className="boton-plano">
+            Cerrar sesión
+          </button>
+        </form>
       </section>
     </div>
   )
