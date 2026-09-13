@@ -4,6 +4,7 @@ import Link from 'next/link'
 import '@/styles/globals.css'
 import { Buscador } from '@/components/Buscador'
 import { auth } from '@/server/auth'
+import { accionSalir } from '@/app/entrar/actions'
 
 /*
   Dos familias, elegidas a propósito:
@@ -64,12 +65,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="ml-auto flex items-center gap-4">
               <Buscador />
               {sesion?.user ? (
-                <Link
-                  href={sesion.user.estado === 'PENDING' ? '/cuenta' : `/j/${sesion.user.slug}`}
-                  className="text-[13px] font-medium"
-                >
-                  {sesion.user.estado === 'PENDING' ? 'Verifica tu nick' : (sesion.user.name ?? 'Mi perfil')}
-                </Link>
+                <>
+                  <Link
+                    href={sesion.user.estado === 'PENDING' ? '/cuenta' : `/j/${sesion.user.slug}`}
+                    className="text-[13px] font-medium"
+                  >
+                    {sesion.user.estado === 'PENDING' ? 'Verifica tu nick' : (sesion.user.name ?? 'Mi perfil')}
+                  </Link>
+                  <Link href="/cuenta" className="text-[13px] text-humo hover:text-brasa">
+                    Mi cuenta
+                  </Link>
+                  <form action={accionSalir}>
+                    <button type="submit" className="text-[13px] text-humo hover:text-brasa">
+                      Salir
+                    </button>
+                  </form>
+                </>
               ) : (
                 <Link href="/entrar" className="boton text-[13px]">
                   Entrar

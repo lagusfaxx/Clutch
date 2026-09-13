@@ -15,6 +15,24 @@ import type { ArticuloTienda, Tienda as DatosTienda } from '@/server/services/fo
 
 type Orden = 'seccion' | 'precio-asc' | 'precio-desc' | 'nombre'
 
+/**
+ * El color de cada rareza, que en Fortnite es parte de cómo se reconoce un
+ * artículo. Son los mismos cinco tonos de las estadísticas, elegidos para
+ * distinguirse con daltonismo sobre el fondo oscuro; la rareza va además
+ * escrita bajo el nombre, así que el color nunca es el único dato.
+ */
+const COLOR_RAREZA: Record<string, string> = {
+  'Poco común': '#3A9E59',
+  Raro: '#3D82C4',
+  Épico: '#A47BE8',
+  Legendario: '#E2542A',
+  'Serie de ídolos': '#1BA8A0',
+  'Leyendas de videojuegos': '#1BA8A0',
+  'Serie Marvel': '#E2542A',
+  'Serie DC': '#3D82C4',
+  'Serie de leyendas de la coreografía': '#A47BE8',
+}
+
 const ORDENES: { valor: Orden; texto: string }[] = [
   { valor: 'seccion', texto: 'Por sección' },
   { valor: 'precio-asc', texto: 'Más barato' },
@@ -46,8 +64,11 @@ function Pavos({ icono, precio, normal }: { icono: string | null; precio: number
 }
 
 function Ficha({ articulo, icono }: { articulo: ArticuloTienda; icono: string | null }) {
+  const color = articulo.rareza ? COLOR_RAREZA[articulo.rareza] : undefined
+
   return (
     <article className="group flex flex-col bg-panel p-3">
+      {color && <span className="mb-2 block h-[3px] w-full" style={{ backgroundColor: color }} aria-hidden />}
       <div className="relative mb-2 aspect-square w-full overflow-hidden bg-panelAlt">
         {articulo.imagen ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -69,7 +90,9 @@ function Ficha({ articulo, icono }: { articulo: ArticuloTienda; icono: string | 
       <p className="line-clamp-2 text-[13px] font-semibold leading-tight" title={articulo.nombre}>
         {articulo.nombre}
       </p>
-      <p className="etiqueta mt-0.5 truncate">{articulo.rareza ?? articulo.tipo}</p>
+      <p className="mt-0.5 truncate text-[11px]" style={{ color: color ?? undefined }}>
+        <span className={color ? '' : 'text-humo'}>{articulo.rareza ?? articulo.tipo}</span>
+      </p>
       <div className="mt-auto">
         <Pavos icono={icono} precio={articulo.precio} normal={articulo.precioNormal} />
       </div>
