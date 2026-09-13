@@ -44,7 +44,7 @@ export function normalizarRut(rut: string): string {
   return `${limpio.slice(0, -1)}-${limpio.slice(-1)}`
 }
 
-async function slugLibre(base: string, db: Db): Promise<string> {
+export async function slugLibre(base: string, db: Db): Promise<string> {
   const raiz = aSlug(base) || 'jugador'
   let intento = raiz
   let n = 2

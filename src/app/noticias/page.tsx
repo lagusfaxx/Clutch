@@ -15,19 +15,21 @@ export default async function NoticiasPage() {
 
   return (
     <div className="space-y-5">
-      <header className="bloque p-5">
-        <h1 className="text-[19px] font-bold">Novedades</h1>
-        <p className="mt-1 text-[13px] text-humo">Lo que Epic está anunciando dentro del juego.</p>
+      <header>
+        <h1 className="text-[28px] font-bold leading-none tracking-tight">Novedades</h1>
+        <p className="mt-1.5 text-[13px] text-humo">
+          Lo que Epic está anunciando dentro del juego{lista ? ` · ${lista.length} avisos` : ''}.
+        </p>
       </header>
 
       {!lista || lista.length === 0 ? (
         <p className="bloque p-5 text-[13px] text-humo">No pudimos traer las novedades ahora.</p>
       ) : (
         lista.map((n) => (
-          <article key={n.id} className="bloque overflow-hidden">
+          <article key={n.id} className="bloque grid gap-0 md:grid-cols-[320px_1fr]">
             {n.imagen && (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={n.imagen} alt="" loading="lazy" className="w-full object-cover" />
+              <img src={n.imagen} alt="" loading="lazy" className="h-full w-full bg-panelAlt object-cover" />
             )}
             <div className="p-5">
               <h2 className="text-[15px] font-bold">{n.titulo}</h2>

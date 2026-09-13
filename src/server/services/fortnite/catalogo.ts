@@ -69,18 +69,37 @@ const entrada = z.object({
 })
 
 const respuestaTienda = z.object({
-  data: z.object({ date: z.string().nullish(), entries: z.array(entrada) }),
+  data: z.object({ date: z.string().nullish(), vbuckIcon: z.string().nullish(), entries: z.array(entrada) }),
 })
 
 export interface ArticuloTienda {
   id: string
   nombre: string
-  tipo: string | null
+  tipo: string
   rareza: string | null
   imagen: string | null
   precio: number | null
   precioNormal: number | null
-  seccion: string | null
+  seccion: string
+  /** Un paquete trae varias cosas por un precio: se marca porque no compara. */
+  paquete: boolean
+}
+
+export interface Tienda {
+  fecha: string | null
+  iconoPavos: string | null
+  articulos: ArticuloTienda[]
+  /** Secciones ordenadas de más a menos artículos, para el índice. */
+  secciones: { nombre: string; cantidad: number }[]
+  tipos: { nombre: string; cantidad: number }[]
+}
+
+function contar(valores: string[]): { nombre: string; cantidad: number }[] {
+  const cuenta = new Map<string, number>()
+  for (const v of valores) cuenta.set(v, (cuenta.get(v) ?? 0) + 1)
+  return [...cuenta.entries()]
+    .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad || a.nombre.localeCompare(b.nombre, 'es'))
 }
 
 /**
@@ -88,7 +107,7 @@ export interface ArticuloTienda {
  * lo que se venda: aspectos, packs, instrumentos, autos, canciones. Acá se
  * aplana a una sola forma para poder dibujarlas todas con la misma ficha.
  */
-export async function tienda(db: Db = prisma): Promise<{ fecha: string | null; articulos: ArticuloTienda[] } | null> {
+export async function tienda(db: Db = prisma): Promise<Tienda | null> {
   const datos = await pedir('/v2/shop?language=es', respuestaTienda, 'fn:tienda:es', TTL_TIENDA_MS, db)
   if (!datos) return null
 
@@ -100,19 +119,31 @@ export async function tienda(db: Db = prisma): Promise<{ fecha: string | null; a
     const nombre = e.bundle?.name ?? cosmetico?.name ?? pista?.title
     if (!nombre) continue
 
+    // El tipo es lo que más se filtra, así que nunca queda vacío. Las pistas
+    // de improvisación van todas juntas bajo su propio tipo: son 126 de 306 y
+    // agruparlas por artista dejaría el filtro inservible.
+    const tipo = pista ? 'Pista de improvisación' : (cosmetico?.type?.displayValue ?? 'Otro')
+
     articulos.push({
       id: e.offerId,
       nombre,
-      tipo: pista ? (pista.artist ?? 'Pista de improvisación') : (cosmetico?.type?.displayValue ?? null),
-      rareza: cosmetico?.rarity?.displayValue ?? null,
+      tipo,
+      rareza: pista ? (pista.artist ?? null) : (cosmetico?.rarity?.displayValue ?? null),
       imagen: e.bundle?.image ?? cosmetico?.images?.icon ?? cosmetico?.images?.smallIcon ?? pista?.albumArt ?? null,
       precio: e.finalPrice ?? null,
       precioNormal: e.regularPrice ?? null,
-      seccion: e.layout?.name?.trim() || null,
+      seccion: e.layout?.name?.trim() || 'Otros',
+      paquete: Boolean(e.bundle),
     })
   }
 
-  return { fecha: datos.data.date ?? null, articulos }
+  return {
+    fecha: datos.data.date ?? null,
+    iconoPavos: datos.data.vbuckIcon ?? null,
+    articulos,
+    secciones: contar(articulos.map((a) => a.seccion)),
+    tipos: contar(articulos.map((a) => a.tipo)),
+  }
 }
 
 /* -------------------------------------------------------------- noticias */

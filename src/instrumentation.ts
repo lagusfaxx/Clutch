@@ -8,6 +8,12 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
+
+  // Antes que la cola y el bot, y sin depender de RUN_BACKGROUND: si el
+  // panel no tiene dueño, no hay a quién pedirle que arregle lo demás.
+  const { asegurarAdminInicial } = await import('@/server/services/admin-inicial')
+  await asegurarAdminInicial().catch((e) => console.error('[admin] no se pudo asegurar la cuenta inicial:', e))
+
   if (process.env.RUN_BACKGROUND !== 'true') return
 
   const { startWorkers, stopWorkers } = await import('@/server/jobs/boss')

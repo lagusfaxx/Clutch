@@ -21,6 +21,7 @@ npm run env:check
 | `FORTNITE_API_KEY` | en la práctica sí | Nadie puede verificar su nick, o sea nadie se inscribe |
 | `PRIZE_ENCRYPTION_KEY` | al entregar premios | Los códigos de V-Bucks no se pueden cargar ni revelar |
 | `RUN_BACKGROUND` | sí | No corre la cola: los torneos no cierran solos |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | la primera vez | Nadie puede entrar al panel: `isAdmin` no se activa desde el sitio |
 | `FORTNITE_API_IO_KEY` | no | Sin respaldo si el proveedor principal se cae |
 | `DISCORD_CLIENT_ID` / `SECRET` | no | No se puede vincular Discord. El login por correo funciona igual |
 | `DISCORD_BOT_TOKEN` | no | Sin bot: sin anuncios, sin recordatorios, sin roles |
@@ -149,6 +150,33 @@ de callback en el portal de Discord. Nada más: el resto se ajusta solo.
 ---
 
 ## 4. Fortnite
+
+### `ADMIN_EMAIL` y `ADMIN_PASSWORD`
+
+La cuenta de administración. Con las dos definidas, el servidor la crea al
+arrancar; si el correo ya tiene cuenta, la deja con permisos de
+administración y con esta misma clave.
+
+Existe porque `isAdmin` no se puede activar desde la aplicación: sin esto, la
+primera cuenta del panel había que marcarla a mano con SQL contra la base de
+producción.
+
+**El entorno manda.** Si la clave guardada no coincide con `ADMIN_PASSWORD`, se
+reescribe en cada arranque. Eso es lo que hace que la variable sirva para
+recuperar el acceso, y la contrapartida es que a esta cuenta no le sirve
+cambiar la clave desde el sitio: al siguiente despliegue vuelve a la del
+entorno. Para el día a día conviene una cuenta normal con `isAdmin`, y dejar
+esta como llave de repuesto.
+
+La clave tiene que cumplir lo mismo que se le exige a cualquier jugador. Si no
+cumple, la cuenta **no se crea** y queda escrito en los logs del contenedor:
+
+```
+[admin] ADMIN_PASSWORD no sirve: ... La cuenta de administración NO se creó.
+```
+
+El panel vive en `/admin` y no tiene enlace en la navegación: se entra
+escribiendo la dirección.
 
 ### `FORTNITE_API_KEY` (fortnite-api.com)
 

@@ -21,6 +21,11 @@ const esquema = z.object({
   TBK_API_KEY: z.string().optional(),
   TBK_AMBIENTE: z.enum(['integracion', 'produccion']).default('integracion'),
   RUN_BACKGROUND: z.enum(['true', 'false']).default('false'),
+  // Cuenta de administración inicial. Sin ella no hay forma de entrar al
+  // panel en un servidor nuevo: `isAdmin` no se activa desde la aplicación.
+  ADMIN_EMAIL: z.string().email().optional(),
+  ADMIN_PASSWORD: z.string().optional(),
+  ADMIN_NAME: z.string().optional(),
   SITE_URL: z.string().url().default('https://clutch.cl'),
 })
 
